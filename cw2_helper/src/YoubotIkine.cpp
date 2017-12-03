@@ -174,31 +174,31 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
 //    }
 
 
-//    // Check the joint limits of 1 and 5
-//    if (ik_theta(0) > 0 && ik_theta(0) < 338*M_PI/180) {
-//        ik_theta_real(0) = ik_theta(0);
-//        ik_theta_real(4) = ik_theta(4);
-//    }
-//    else if (ik_theta_2(0) > 0 && ik_theta_2(0) < 338*M_PI/180) {
-//        ik_theta_real(0) = ik_theta_2(0);
-//        ik_theta_real(4) = ik_theta_2(4);
-//    }
-//
-//    // Check the joint limits of 3,2 and 4
-//    if (ik_theta(2) > -297*M_PI/180 && ik_theta(2) < 0 && ik_theta(1) < 155*M_PI/180){
-//        ik_theta_real(2) = ik_theta(2);
-//        ik_theta_real(1) = ik_theta(1);
-//        ik_theta_real(3) = ik_theta(3);
-//    }
-//    else if (ik_theta_1(2) > -297*M_PI/180 && ik_theta_1(2) < 0 && ik_theta_1(1) < 155*M_PI/180){
-//        ik_theta_real(2) = ik_theta_1(2);
-//        ik_theta_real(1) = ik_theta_1(1);
-//        ik_theta_real(3) = ik_theta_1(3);
-//    }
-//
-//    // Check if joint 5 exceeds 2*pi
-//    if (ik_theta_real(4) > 2*M_PI)
-//        ik_theta_real(4) = ik_theta_real(4) - 2*M_PI;
+    // Check the joint limits of 1 and 5
+    if (ik_theta(0) > 0 && ik_theta(0) < 338*M_PI/180) {
+        ik_theta_real(0) = ik_theta(0);
+        ik_theta_real(4) = ik_theta(4);
+    }
+    else if (ik_theta_2(0) > 0 && ik_theta_2(0) < 338*M_PI/180) {
+        ik_theta_real(0) = ik_theta_2(0);
+        ik_theta_real(4) = ik_theta_2(4);
+    }
+
+    // Check the joint limits of 3,2 and 4
+    if (ik_theta(2) > -297*M_PI/180 && ik_theta(2) < 0 && ik_theta(1) < 155*M_PI/180){
+        ik_theta_real(2) = ik_theta(2);
+        ik_theta_real(1) = ik_theta(1);
+        ik_theta_real(3) = ik_theta(3);
+    }
+    else if (ik_theta_1(2) > -297*M_PI/180 && ik_theta_1(2) < 0 && ik_theta_1(1) < 155*M_PI/180){
+        ik_theta_real(2) = ik_theta_1(2);
+        ik_theta_real(1) = ik_theta_1(1);
+        ik_theta_real(3) = ik_theta_1(3);
+    }
+
+    // Check if joint 5 exceeds 2*pi
+    if (ik_theta_real(4) > 2*M_PI)
+        ik_theta_real(4) = ik_theta_real(4) - 2*M_PI;
 
 
 
@@ -214,16 +214,19 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
 //    std::cout<<"\nFinal"<<std::endl;
 //    std::cout<<ik_theta_real(0)<<" "<<ik_theta_real(1)<<" "<<ik_theta_real(2)<<" "<<ik_theta_real(3)<<" "<<ik_theta_real(4)<<std::endl;
 
-    return ik_theta;
+    return ik_theta_real;
 
 }
 
 VectorXd YoubotIkine::inverse_kinematics_jac(Matrix4d desired_pose)
 {
     //Add iterative inverse kinematics code. (without using KDL libraries)
-    VectorXd previous_joint_position = current_joint_position;
+    VectorXd previous_joint_position(5);
+    for (int i = 1; i < 5; i++){
+        previous_joint_position(i) = DH_params[i][3] - current_joint_position(i);
+    }
 
-    float lambda=0.3;
+    float lambda=0.5;
     VectorXd desired_pose_vec = rotationMatrix_Vector(desired_pose);
 
     for (int k=0;k<100000;k++){
@@ -236,16 +239,17 @@ VectorXd YoubotIkine::inverse_kinematics_jac(Matrix4d desired_pose)
 
         // re-adjust the limits
         for (int i=0;i<5; i++){
-            if (desired_joint_position(i)<0)
+            while (desired_joint_position(i)<-M_PI)
                 desired_joint_position(i) = desired_joint_position(i) + 2*M_PI;
-            if (desired_joint_position(i)>2*M_PI)
+            while (desired_joint_position(i)>=M_PI)
                 desired_joint_position(i) = desired_joint_position(i) - 2*M_PI;
         }
 
-        if ((desired_pose_vec-previous_pose_vec).maxCoeff() < 0.1 || check_singularity(desired_joint_position)) {
+
+        if ((desired_pose_vec-previous_pose_vec).norm() < 0.001 || check_singularity(desired_joint_position)) {
             desired_joint_position = previous_joint_position;
-//            for (int i = 0; i < 5; i++)
-//                desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
+            for (int i = 0; i < 5; i++)
+                desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
             break;
         }
 

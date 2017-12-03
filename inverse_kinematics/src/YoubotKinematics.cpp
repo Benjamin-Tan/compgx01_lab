@@ -47,7 +47,7 @@ KDL::JntArray YoubotKinematics::inverse_kinematics_closed(KDL::Frame desired_pos
 void YoubotKinematics::publish_joint_trajectory(trajectory_msgs::JointTrajectoryPoint joint_trajectory)
 {
 
-    int time_from_start = 537230041;
+    int time_from_start = 500000000;//537230041;
 
     trajectory_msgs::JointTrajectory msg;
 

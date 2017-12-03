@@ -13,7 +13,7 @@
 
 trajectory_msgs::JointTrajectoryPoint traj_pt;
 
-
+//MatrixXd get_checkpoint(YoubotKDL *youbot_kine)
 MatrixXd get_checkpoint(YoubotIkine *youbot_kine)
 {
     rosbag::Bag bag;
@@ -24,7 +24,7 @@ MatrixXd get_checkpoint(YoubotIkine *youbot_kine)
 
     std::vector<std::string> topics;
     MatrixXd p;
-    p.resize(5,5);
+    p.resize(5,8);
 
     VectorXd desired_joint_value;
 
@@ -38,7 +38,7 @@ MatrixXd get_checkpoint(YoubotIkine *youbot_kine)
     {
         geometry_msgs::TransformStamped::ConstPtr j = m.instantiate<geometry_msgs::TransformStamped>();
         if (countMessage>4)
-            p.conservativeResize(countMessage+1,5); //change the size of matrix without affecting old values
+            p.conservativeResize(countMessage+1,8); //change the size of matrix without affecting old values
 
         if (j != NULL)
         {
@@ -48,19 +48,28 @@ MatrixXd get_checkpoint(YoubotIkine *youbot_kine)
 //            ROS_INFO("Translate: %f %f %f\n",targetTF.transform.translation.x,targetTF.transform.translation.y,targetTF.transform.translation.z);
 //            ROS_INFO("Rotation : %f %f %f %f\n\n",targetTF.transform.rotation.x,targetTF.transform.rotation.y,targetTF.transform.rotation.z,targetTF.transform.rotation.w);
 
-            MatrixXd targetTF_matrix = youbotKine.pose_rotationMat(targetTF);
+//            MatrixXd targetTF_matrix = youbotKine.pose_rotationMat(targetTF);
 //            desired_joint_value = youbotKine.inverse_kinematics_jac(targetTF_matrix);
-            desired_joint_value = youbotKine.inverse_kinematics_closed(targetTF_matrix);
+////            desired_joint_value = youbotKine.inverse_kinematics_closed(targetTF_matrix);
 
 //            KDL::Frame frame = tf2::transformToKDL(targetTF);
 //            KDL::JntArray jointkdl = youbotKine.inverse_kinematics_closed(frame);
+            p(countMessage,0) = targetTF.transform.translation.x;
+            p(countMessage,1) = targetTF.transform.translation.y;
+            p(countMessage,2) = targetTF.transform.translation.z;
 
-            for (int i=0; i<5; i++) {
-                p(countMessage,i) = desired_joint_value(i);
-//                p(countMessage,i) = jointkdl.data(i);
-            }
-            std::cout << p(countMessage,0) <<" "<<p(countMessage,1)<<" "<<p(countMessage,2)<<" "<<p(countMessage,3)<<" "<<p(countMessage,4)<<std::endl;
+            p(countMessage,3) = targetTF.transform.rotation.x;
+            p(countMessage,4) = targetTF.transform.rotation.y;
+            p(countMessage,5) = targetTF.transform.rotation.z;
+            p(countMessage,6) = targetTF.transform.rotation.w;
 
+            p(countMessage,7) = targetTF.header.stamp.sec + targetTF.header.stamp.nsec /1e9;
+
+//            for (int i=0; i<5; i++) {
+//                p(countMessage,i) = desired_joint_value(i);
+////                p(countMessage,i) = jointkdl.data(i);
+//            }
+            std::cout<<"\n"<<p<<std::endl;
         }
         countMessage++;
 
@@ -157,24 +166,24 @@ int main(int argc, char **argv)
     std::cout<< youbot_kdl_test.current_joint_position.data(0) <<" "<<youbot_kdl_test.current_joint_position.data(1) <<" "<<youbot_kdl_test.current_joint_position.data(2) <<std::endl;
     std::cout<< youbot_kine.current_joint_position(0) <<" "<<youbot_kine.current_joint_position(1)<<" "<<youbot_kine.current_joint_position(2)<<std::endl;
 
-//    int countPoints=check_point_matrix.rows();
-//    int cPoints = 0;
-//    std::cout<<countPoints<<std::endl;
+    int countPoints=check_point_matrix.rows();
+    int cPoints = 0;
+    std::cout<<countPoints<<std::endl;
     while (ros::ok())
     {
-//        for (cPoints=0;cPoints<countPoints;cPoints++) {
-//            std::cout<<"start "<< cPoints << std::endl;
-//
-//            traj_q4b(check_point_matrix,cPoints);
-//
-//            ros::Duration(0.5).sleep();
-//            youbot_kine.publish_joint_trajectory(traj_pt);
-//
-//            ros::Duration(2.0).sleep();
-//            std::cout<<"after publish\n"<<cPoints<<std::endl;
-//
-//        }
-//        cPoints = 0;
+        for (cPoints=0;cPoints<countPoints;cPoints++) {
+            std::cout<<"start "<< cPoints << std::endl;
+
+            traj_q4b(check_point_matrix,cPoints);
+
+            ros::Duration(0.5).sleep();
+            youbot_kine.publish_joint_trajectory(traj_pt);
+
+            ros::Duration(2.0).sleep();
+            std::cout<<"after publish\n"<<cPoints<<std::endl;
+
+        }
+        cPoints = 0;
         ros::spinOnce();
         sleep(1);
     }

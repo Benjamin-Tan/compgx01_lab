@@ -12,7 +12,7 @@
 #include <inverse_kinematics/YoubotKDL.h>
 
 trajectory_msgs::JointTrajectoryPoint traj_pt;
-
+MatrixXd traj_points;
 
 MatrixXd get_checkpoint()
 {
@@ -21,7 +21,7 @@ MatrixXd get_checkpoint()
 
     std::vector<std::string> topics;
     MatrixXd p;
-    p.resize(5,5);
+    p.resize(5,11); // 1st 5 columns (position), 2nd 5 columns (velocity), last column (time)
 
     bag.open("/home/benjamintan/catkin_ws/src/compgx01_lab/cw2_helper/bags/data_q4a.bag", rosbag::bagmode::Read);
     topics.push_back(std::string("joint_data"));
@@ -33,16 +33,19 @@ MatrixXd get_checkpoint()
     {
         sensor_msgs::JointState::ConstPtr j = m.instantiate<sensor_msgs::JointState>();
         if (countMessage>4)
-            p.conservativeResize(countMessage+1,5); //change the size of matrix without affecting old values
+            p.conservativeResize(countMessage+1,11); //change the size of matrix without affecting old values
 
         if (j != NULL)
         {
             //Fill in the code to retrieve data from a bag
             jointData = *j;
             for (int i=0; i<5; i++) {
+
                 p(countMessage,i) = jointData.position[i];
+                p(countMessage,i+5) = jointData.velocity[i];
             }
-            std::cout << p(countMessage,0) <<" "<<p(countMessage,1)<<" "<<p(countMessage,2)<<" "<<p(countMessage,3)<<" "<<p(countMessage,4)<<std::endl;
+            // combine the time stamp into sec
+            p(countMessage,10) = jointData.header.stamp.sec + jointData.header.stamp.nsec / 1e9;
 
         }
         countMessage++;
@@ -55,16 +58,94 @@ MatrixXd get_checkpoint()
 
 }
 
-void traj_q4a (MatrixXd checkpoint, int countMessage)
-{
-    // Do something
-    // Converts the checkpoint matrix into trajectory point messages
+MatrixXd computeA_constant(MatrixXd checkpoint, int cMessage){
 
-    traj_pt.positions.clear();
-    for (int i=0; i<5; i++){
-        traj_pt.positions.push_back(checkpoint(countMessage,i));
+    MatrixXd A;
+    A.resize(5, 4);
+    VectorXd a(4), q(4);
+
+    double time_init, time_final;
+
+    if (cMessage == 0) {
+        time_init = 0;
+        time_final = checkpoint(cMessage, 10);
+    } else {
+        time_init = checkpoint(cMessage - 1, 10);
+        time_final = checkpoint(cMessage, 10);
     }
 
+    time_final = time_final - time_init;
+    time_init = 0;
+
+    Matrix4d timeMat;
+    timeMat << 1,  time_init,  pow(time_init, 2),      pow(time_init, 3),
+               0,          1,      2 * time_init,  3 * pow(time_init, 2),
+               1, time_final, pow(time_final, 2),     pow(time_final, 3),
+               0,          1,     2 * time_final, 3 * pow(time_final, 2);
+
+    // loop through each joints to find corresponding constant a
+    for (int i = 0; i < 5; i++) {
+        if (cMessage == 0) {
+            q << 0, 0, checkpoint(cMessage, i), checkpoint(cMessage, i + 5);
+            a = timeMat.inverse() * q;
+            A.row(i) = a.transpose();
+        }
+        else {
+            q << checkpoint(cMessage - 1, i), checkpoint(cMessage - 1, i + 5), checkpoint(cMessage,i), checkpoint(cMessage, i + 5);
+            a = timeMat.inverse() * q;
+            A.row(i) = a.transpose();
+        }
+    }
+
+    return A;
+}
+
+void traj_q4a (MatrixXd checkpoint)
+{
+    // Do something
+    // Converts the checkpoint matrix into trajectory point messages using cubic spline
+
+    double time_init, time_final;
+    double dt = 0.5; // 0.5 seconds
+
+    int countMessage = checkpoint.rows();
+    int updateSize = 0;
+
+    VectorXd sol_pos(5), sol_vel(5); // solution for position and velocity
+    Vector4d t_pos, t_vel; // time vector for position and velocity
+
+    traj_points.resize(5,11);
+
+
+    for (int cMessage = 0;cMessage<countMessage;cMessage++) {
+
+        MatrixXd A = computeA_constant(checkpoint,cMessage);
+
+        time_final = checkpoint(cMessage,10);
+
+        int totalStep = floor((time_final-time_init) / dt);
+        // Compute trajectory
+        traj_points.conservativeResize(updateSize + totalStep, 11); //change the size of matrix without affecting old values
+
+        double cTime = 0;
+        for (int cStep = 0; cStep < totalStep; cStep++) {
+
+            t_pos << 1, cTime, pow(cTime, 2),     pow(cTime, 3);
+            t_vel << 0,     1,     2 * cTime, 3 * pow(cTime, 2);
+
+            sol_pos = A * t_pos;
+            sol_vel = A * t_vel;
+
+            traj_points.block(cStep + updateSize, 0, 1, 5) = sol_pos.transpose();
+            traj_points.block(cStep + updateSize, 5, 1, 5) = sol_vel.transpose();
+
+            cTime+= dt;
+        }
+
+        time_init = time_final;
+        updateSize = traj_points.rows(); // update the current rows of points
+        //std::cout<<traj_points<<std::endl;
+    }
 }
 
 int main(int argc, char **argv)
@@ -77,21 +158,27 @@ int main(int argc, char **argv)
 
     MatrixXd check_point_matrix = get_checkpoint();
 
-    int countPoints=check_point_matrix.rows();
+    traj_q4a(check_point_matrix);
+
+    int countPoints=traj_points.rows();
     int cPoints = 0;
-    std::cout<<countPoints<<std::endl;
+
     while (ros::ok())
     {
         for (cPoints=0;cPoints<countPoints;cPoints++) {
             std::cout<<"start "<< cPoints << std::endl;
 
-            traj_q4a(check_point_matrix,cPoints);
-
-            ros::Duration(0.2).sleep();
+            traj_pt.positions.clear();
+            traj_pt.velocities.clear();
+            // Assign the position and velocity into the message
+            for (int i=0; i<5; i++){
+                traj_pt.positions.push_back(traj_points(cPoints,i));
+                traj_pt.velocities.push_back(traj_points(cPoints,i+5));
+            }
             youbot_kine.publish_joint_trajectory(traj_pt);
 
-            ros::Duration(1.5).sleep();
-            std::cout<<"after publish\n"<<cPoints<<std::endl;
+            ros::Duration(0.5).sleep();
+            std::cout<<"after publish\n"<<std::endl;
 
         }
         ros::spinOnce();
