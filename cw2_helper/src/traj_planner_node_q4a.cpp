@@ -175,7 +175,7 @@ int main(int argc, char **argv)
                 traj_pt.positions.push_back(traj_points(cPoints,i));
                 traj_pt.velocities.push_back(traj_points(cPoints,i+5));
             }
-            youbot_kine.publish_joint_trajectory(traj_pt);
+            youbot_kine.publish_trajectory(traj_pt,5e8);
 
             ros::Duration(0.5).sleep();
             std::cout<<"after publish\n"<<std::endl;

@@ -13,6 +13,8 @@ private:
     VectorXd desired_joint_position;
     MatrixXd jacobian;
 
+    ros::Publisher publisher;
+
 public:
     VectorXd current_joint_position;
 
@@ -20,13 +22,15 @@ public:
     void joint_state_callback(const sensor_msgs::JointState::ConstPtr &q);
     MatrixXd get_jacobian(Eigen::VectorXd current_pose);
     VectorXd inverse_kinematics_closed(Eigen::Matrix4d desired_pose);
-    VectorXd inverse_kinematics_jac(Eigen::Matrix4d desired_pose);
+    VectorXd inverse_kinematics_jac(Eigen::VectorXd desired_pose_vec);
     Matrix4d forward_kinematics(Eigen::VectorXd current_joint_position, int count);
     bool check_singularity(VectorXd joint_position);
 
     VectorXd rotationMatrix_Vector(Matrix4d rotationMatrix);
     VectorXd pose_rotationVec(geometry_msgs::TransformStamped pose);
     Matrix4d pose_rotationMat(geometry_msgs::TransformStamped pose);
+    void publish_trajectory(trajectory_msgs::JointTrajectoryPoint joint_trajectory,int dt);
+    Matrix4d vectorQuat_rotationMat(VectorXd pose);
 };
 
 #endif //CW2_HELPER_YOUBOTMANUAL_H

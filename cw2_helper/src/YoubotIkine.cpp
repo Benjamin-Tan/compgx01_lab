@@ -9,6 +9,8 @@ void YoubotIkine::init()
     current_joint_position.resize(5);
     desired_joint_position.resize(5);
     jacobian.resize(6, 5);
+
+    this->publisher = this->n.advertise<trajectory_msgs::JointTrajectory>("/EffortJointInterface_trajectory_controller/command", 3);
 }
 
 void YoubotIkine::joint_state_callback(const sensor_msgs::JointState::ConstPtr &q) {
@@ -218,16 +220,16 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
 
 }
 
-VectorXd YoubotIkine::inverse_kinematics_jac(Matrix4d desired_pose)
+VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
 {
     //Add iterative inverse kinematics code. (without using KDL libraries)
     VectorXd previous_joint_position(5);
+    // reverse the offset[-pi,pi] to raw [0,2pi];
     for (int i = 1; i < 5; i++){
         previous_joint_position(i) = DH_params[i][3] - current_joint_position(i);
     }
 
     float lambda=0.5;
-    VectorXd desired_pose_vec = rotationMatrix_Vector(desired_pose);
 
     for (int k=0;k<100000;k++){
         Matrix4d previous_pose = forward_kinematics(previous_joint_position,5);
@@ -246,10 +248,10 @@ VectorXd YoubotIkine::inverse_kinematics_jac(Matrix4d desired_pose)
         }
 
 
-        if ((desired_pose_vec-previous_pose_vec).norm() < 0.001 || check_singularity(desired_joint_position)) {
+        if ((desired_pose_vec-previous_pose_vec).norm() < 0.1 || check_singularity(desired_joint_position)) {
             desired_joint_position = previous_joint_position;
-            for (int i = 0; i < 5; i++)
-                desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
+//            for (int i = 0; i < 5; i++)
+//                desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
             break;
         }
 
@@ -312,7 +314,7 @@ Matrix4d YoubotIkine::forward_kinematics(VectorXd current_joint_position,int cou
 bool YoubotIkine::check_singularity(VectorXd joint_position)
 {
     //Add singularity checker. (without using KDL libraries)
-    if ((jacobian.transpose()*jacobian).determinant()==0)
+    if ((jacobian.transpose()*jacobian).determinant()<0.4)
         return 1;
     else
         return 0;
@@ -418,4 +420,59 @@ Matrix4d YoubotIkine::pose_rotationMat(geometry_msgs::TransformStamped pose){
     rotationMat(3,3) = 1;
 
     return rotationMat;
+}
+
+Matrix4d YoubotIkine::vectorQuat_rotationMat(VectorXd pose){
+    // Quaternion to rotation matrix
+    Matrix4d rotationMat;
+
+    double qx,qy,qz,qw;
+
+    qx = pose(3);
+    qy = pose(4);
+    qz = pose(5);
+    qw = pose(6);
+
+    rotationMat(0,0) = 1-2*pow(qy,2)-2*pow(qz,2);
+    rotationMat(1,0) = 2*qx*qy+2*qz*qw;
+    rotationMat(2,0) = 2*qx*qz-2*qy*qw;
+    rotationMat(3,0) = 0;
+
+    rotationMat(0,1) = 2*qx*qy-2*qz*qw;
+    rotationMat(1,1) = 1-2*pow(qx,2)-2*pow(qz,2);
+    rotationMat(2,1) = 2*qy*qz+2*qx*qw;
+    rotationMat(3,1) = 0;
+
+    rotationMat(0,2) = 2*qx*qz+2*qy*qw;
+    rotationMat(1,2) = 2*qy*qz-2*qx*qw;
+    rotationMat(2,2) = 1-2*pow(qx,2)-2*pow(qy,2);
+    rotationMat(3,2) = 0;
+
+    rotationMat(0,3) = pose(0);
+    rotationMat(1,3) = pose(1);
+    rotationMat(2,3) = pose(2);
+    rotationMat(3,3) = 1;
+
+    return rotationMat;
+}
+
+void YoubotIkine::publish_trajectory(trajectory_msgs::JointTrajectoryPoint joint_trajectory,int dt)
+{
+
+    int time_from_start = dt;//537230041;
+
+    trajectory_msgs::JointTrajectory msg;
+
+    msg.header.stamp = ros::Time::now();
+    msg.joint_names.push_back("arm_joint_1");
+    msg.joint_names.push_back("arm_joint_2");
+    msg.joint_names.push_back("arm_joint_3");
+    msg.joint_names.push_back("arm_joint_4");
+    msg.joint_names.push_back("arm_joint_5");
+
+    joint_trajectory.time_from_start.nsec = time_from_start;
+
+    msg.points.push_back(joint_trajectory);
+
+    this->publisher.publish(msg);
 }
