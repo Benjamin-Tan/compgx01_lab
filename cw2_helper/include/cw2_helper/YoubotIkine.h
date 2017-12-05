@@ -2,6 +2,8 @@
 #define CW2_HELPER_YOUBOTMANUAL_H
 
 #include <inverse_kinematics/YoubotKinematics.h>
+#include <gazebo_msgs/LinkStates.h>
+
 
 using namespace Eigen;
 
@@ -13,10 +15,13 @@ private:
     VectorXd desired_joint_position;
     MatrixXd jacobian;
 
+    ros::Subscriber subscriber_obstacle;
     ros::Publisher publisher;
 
 public:
+
     VectorXd current_joint_position;
+    MatrixXd obstacle_position;
 
     void init();
     void joint_state_callback(const sensor_msgs::JointState::ConstPtr &q);
@@ -26,11 +31,15 @@ public:
     Matrix4d forward_kinematics(Eigen::VectorXd current_joint_position, int count);
     bool check_singularity(VectorXd joint_position);
 
+    KDL::Frame poseMatrix_kdlFrame(Matrix4d pose);
     VectorXd rotationMatrix_Vector(Matrix4d rotationMatrix);
+    Matrix4d rotationVector_Matrix(VectorXd rotationVector);
     VectorXd pose_rotationVec(geometry_msgs::TransformStamped pose);
     Matrix4d pose_rotationMat(geometry_msgs::TransformStamped pose);
     void publish_trajectory(trajectory_msgs::JointTrajectoryPoint joint_trajectory,int dt);
     Matrix4d vectorQuat_rotationMat(VectorXd pose);
+
+    void obstacle_callback(const gazebo_msgs::LinkStates::ConstPtr &w);
 };
 
 #endif //CW2_HELPER_YOUBOTMANUAL_H

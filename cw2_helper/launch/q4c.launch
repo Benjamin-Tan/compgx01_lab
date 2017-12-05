@@ -1,13 +1,14 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="gui" default="false"/>
+  <arg name="gui" default="true"/>
   <arg name="rviz" default="false"/>
-  <arg name="trajectory_interface" default="false"/>
+  <arg name="trajectory_interface" default="true"/>
 
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="paused" value="false"/>
     
     <!-- Uncomment this line only if working with q4c and q4d <arg name="world_name" value="$(find youbot_simulator)/worlds/world_cd.world"/> -->
+	<arg name="world_name" value="$(find youbot_simulator)/worlds/world_cd.world"/>
     <!-- Uncomment this line only if working with the extra question <arg name="world_name" value="$(find youbot_simulator)/worlds/world_extra.world"/> -->
 
     <arg name="use_sim_time" value="true"/>
@@ -20,9 +21,9 @@
 	<node name="youbot_load_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-urdf -param robot_description -model youbot" respawn="false" output="screen"/>
 	
 	<!-- Change args value to the correct dataset (q4a = 1, q4b = 2, q4c = 3, q4c = 4, q_extra = 5)-->
-	<node name="trail_node" pkg="youbot_trail_rviz" type="youbot_trail_rviz_node" args="1"/>
+	<node name="trail_node" pkg="youbot_trail_rviz" type="youbot_trail_rviz_node" args="3"/>
 	<!-- Insert your node name here -->
-	<node name="youbot_traj_4a" pkg="cw2_helper" type="traj_planner_node_q4a"/>
+	<!--node name="youbot_traj_4c" pkg="cw2_helper" type="traj_planner_node_q4c"/-->
 	
   <include file="$(find youbot_simulator)/launch/youbot_controller.launch">
     <arg name="trajectory_interface" value="$(arg trajectory_interface)"/>

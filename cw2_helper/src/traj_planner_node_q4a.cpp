@@ -140,6 +140,20 @@ void traj_q4a (MatrixXd checkpoint)
             traj_points.block(cStep + updateSize, 5, 1, 5) = sol_vel.transpose();
 
             cTime+= dt;
+            // compute the last step
+            if (cMessage==9){
+
+                traj_points.conservativeResize(updateSize + totalStep + 1, 11); //change the size of matrix without affecting old values
+
+                t_pos << 1, cTime, pow(cTime, 2),     pow(cTime, 3);
+                t_vel << 0,     1,     2 * cTime, 3 * pow(cTime, 2);
+
+                sol_pos = A * t_pos;
+                sol_vel = A * t_vel;
+
+                traj_points.block(cStep + updateSize + 1, 0, 1, 5) = sol_pos.transpose();
+                traj_points.block(cStep + updateSize + 1, 5, 1, 5) = sol_vel.transpose();
+            }
         }
 
         time_init = time_final;
@@ -180,9 +194,9 @@ int main(int argc, char **argv)
             ros::Duration(0.5).sleep();
             std::cout<<"after publish\n"<<std::endl;
 
+            ros::spinOnce();
         }
-        ros::spinOnce();
-//        sleep(1);
+
     }
 
     return 0;

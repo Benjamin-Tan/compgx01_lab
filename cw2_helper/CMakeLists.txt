@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   rosbag
   inverse_kinematics
+  gazebo_msgs
 )
 
 find_package(Eigen3 REQUIRED)

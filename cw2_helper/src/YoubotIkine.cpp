@@ -1,11 +1,15 @@
 #include <cw2_helper/YoubotIkine.h>
 #include <cmath>
+#include <unsupported/Eigen/MatrixFunctions>
+#include <gazebo_msgs/LinkStates.h>
 
 void YoubotIkine::init()
 {
     YoubotKinematics::init();
     subscriber_joint_state = n.subscribe<sensor_msgs::JointState>("/joint_states", 5, &YoubotIkine::joint_state_callback,
                                                                   this);
+    subscriber_obstacle = n.subscribe<gazebo_msgs::LinkStates>("/gazebo/link_states",5,&YoubotIkine::obstacle_callback,this);
+
     current_joint_position.resize(5);
     desired_joint_position.resize(5);
     jacobian.resize(6, 5);
@@ -17,6 +21,18 @@ void YoubotIkine::joint_state_callback(const sensor_msgs::JointState::ConstPtr &
     for (int i = 0; i < 5; i++)
         current_joint_position(i) = DH_params[i][3] - q->position.at(i);
 }
+
+void YoubotIkine::obstacle_callback(const gazebo_msgs::LinkStates::ConstPtr &w){
+    obstacle_position.resize(5,3);
+
+    for (int i = 0; i < 5; i++)
+    {
+        obstacle_position(i,0) =w->pose[i+1].position.x;
+        obstacle_position(i,1) =w->pose[i+1].position.y;
+        obstacle_position(i,2) =w->pose[i+1].position.z;
+    }
+}
+
 
 MatrixXd YoubotIkine::get_jacobian(VectorXd current_pose)
 {
@@ -126,16 +142,16 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
 
     // Check isnan, if it is, max its position
     if (std::isnan(ik_theta(2)))
-        ik_theta(2) = 0;//-(148)*M_PI/180;
+        ik_theta(2) = -(148)*M_PI/180;
 
     if (std::isnan(ik_theta_1(2)))
-        ik_theta_1(2) = 0;//-(148)*M_PI/180;
+        ik_theta_1(2) = -(148)*M_PI/180;
 
     if (std::isnan(ik_theta_2(2)))
-        ik_theta_2(2) = 0;//-(148)*M_PI/180;
+        ik_theta_2(2) = -(148)*M_PI/180;
 
     if (std::isnan(ik_theta_3(2)))
-        ik_theta_3(2) = 0;//-(148)*M_PI/180;
+        ik_theta_3(2) = -(148)*M_PI/180;
 
 
     A = 135*cos(ik_theta(2)) + 155;
@@ -208,10 +224,10 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
 
 
 
-    std::cout<< "\n"<< ik_theta(0) <<" "<<ik_theta(1)<<" "<<ik_theta(2)<<" "<<ik_theta(3)<<" "<<ik_theta(4)<<std::endl;
-    std::cout << ik_theta_1(0) <<" "<<ik_theta_1(1)<<" "<<ik_theta_1(2)<<" "<<ik_theta_1(3)<<" "<<ik_theta_1(4)<<std::endl;
-    std::cout<< ik_theta_2(0) <<" "<<ik_theta_2(1)<<" "<<ik_theta_2(2)<<" "<<ik_theta_2(3)<<" "<<ik_theta_2(4)<<std::endl;
-    std::cout<< ik_theta_3(0) <<" "<<ik_theta_3(1)<<" "<<ik_theta_3(2)<<" "<<ik_theta_3(3)<<" "<<ik_theta_3(4)<<std::endl;
+    std::cout<< "\n"<< ik_theta.transpose()<<std::endl;
+    std::cout << ik_theta_1.transpose()<<std::endl;
+    std::cout<< ik_theta_2.transpose()<<std::endl;
+    std::cout<< ik_theta_3.transpose()<<std::endl;
 //
 //    std::cout<<"\nFinal"<<std::endl;
 //    std::cout<<ik_theta_real(0)<<" "<<ik_theta_real(1)<<" "<<ik_theta_real(2)<<" "<<ik_theta_real(3)<<" "<<ik_theta_real(4)<<std::endl;
@@ -229,7 +245,7 @@ VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
         previous_joint_position(i) = DH_params[i][3] - current_joint_position(i);
     }
 
-    float lambda=0.5;
+    float lambda=0.2;
 
     for (int k=0;k<100000;k++){
         Matrix4d previous_pose = forward_kinematics(previous_joint_position,5);
@@ -248,7 +264,7 @@ VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
         }
 
 
-        if ((desired_pose_vec-previous_pose_vec).norm() < 0.1 || check_singularity(desired_joint_position)) {
+        if ((desired_pose_vec-previous_pose_vec).norm() < 0.001 || check_singularity(desired_joint_position)) {
             desired_joint_position = previous_joint_position;
 //            for (int i = 0; i < 5; i++)
 //                desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
@@ -314,7 +330,7 @@ Matrix4d YoubotIkine::forward_kinematics(VectorXd current_joint_position,int cou
 bool YoubotIkine::check_singularity(VectorXd joint_position)
 {
     //Add singularity checker. (without using KDL libraries)
-    if ((jacobian.transpose()*jacobian).determinant()<0.4)
+    if ((jacobian.transpose()*jacobian).determinant()<0.0001)
         return 1;
     else
         return 0;
@@ -359,6 +375,99 @@ VectorXd YoubotIkine::rotationMatrix_Vector(Matrix4d rotationMatrix){
     }
 
     return rotationVector;
+}
+
+Matrix4d YoubotIkine::rotationVector_Matrix(VectorXd rotationVector){
+    // Put u vector in a format of skew matrix
+    Matrix3d rotationMatrix;
+    rotationMatrix << 0, -rotationVector(5),rotationVector(4),
+                     rotationVector(5),0,-rotationVector(3),
+                     -rotationVector(4),rotationVector(3),0;
+
+    rotationMatrix = rotationMatrix.exp();
+
+    Matrix4d full_transformMat;
+
+    full_transformMat(0,3) = rotationVector(0);
+    full_transformMat(1,3) = rotationVector(1);
+    full_transformMat(2,3) = rotationVector(2);
+    full_transformMat(3,3) = 0;
+    full_transformMat(3,2) = full_transformMat(3,3);
+    full_transformMat(3,1) = full_transformMat(3,3);
+    full_transformMat(3,0) = full_transformMat(3,3);
+
+    full_transformMat.block(0,0,3,3) = rotationMatrix;
+
+    return full_transformMat;
+}
+
+KDL::Frame YoubotIkine::poseMatrix_kdlFrame(Matrix4d pose){
+    geometry_msgs::TransformStamped trans;
+    trans.transform.translation.x = pose(0,3);
+    trans.transform.translation.y = pose(1,3);
+    trans.transform.translation.z = pose(2,3);
+
+    // rotation matrix to quat
+    double x,y,z,w;
+    int matrixSize = 9;
+    double r[matrixSize];
+
+    for (int a=0 ; a < 3; a = a + 1){
+        r[a]=pose(0,a);
+    }
+    for (int b=0 ; b < 3; b = b + 1){
+        r[b+3]=pose(1,b);
+    }
+    for (int c=0 ; c < 3; c = c + 1){
+        r[c+6]=pose(2,c);
+    }
+
+    // Mathematical manipulation
+
+    double trace = r[0]+r[4]+r[8];
+
+    if (trace > 0)
+    {
+        double denominator = sqrt(trace+1)*2; // denominator = 4 * qw
+        x = (r[7]-r[5])/denominator;
+        y = (r[2]-r[6])/denominator;
+        z = (r[3]-r[1])/denominator;
+        w = 0.25*denominator;
+    }
+    else if ( (r[0] > r[4]) & (r[0] > r[8]) )
+    {
+        double denominator = sqrt(1+r[0]-r[4]-r[8])*2; // denominator = 4 * qx
+        x = 0.25*denominator;
+        y = (r[1]+r[3])/denominator;
+        z = (r[2]+r[6])/denominator;
+        w = (r[7]-r[5])/denominator;
+    }
+    else if (r[4] > r[8])
+    {
+        double denominator = sqrt(1+r[4]-r[0]-r[8])*2; // denominator = 4 * qy
+        x = (r[1]+r[3])/denominator;
+        y = 0.25*denominator;
+        z = (r[7]+r[5])/denominator;
+        w = (r[2]-r[6])/denominator;
+    }
+    else
+    {
+        double denominator = sqrt(1+r[8]-r[0]-r[4])*2; // denominator = 4 * qz
+        x = (r[2]+r[6])/denominator;
+        y = (r[7]+r[5])/denominator;
+        z = 0.25*denominator;
+        w = (r[3]-r[1])/denominator;
+    }
+
+    trans.transform.rotation.x = x;
+    trans.transform.rotation.y = y;
+    trans.transform.rotation.z = z;
+    trans.transform.rotation.w = w;
+
+
+    KDL::Frame desiredPose = tf2::transformToKDL(trans);
+    return desiredPose;
+
 }
 
 VectorXd YoubotIkine::pose_rotationVec(geometry_msgs::TransformStamped pose){
