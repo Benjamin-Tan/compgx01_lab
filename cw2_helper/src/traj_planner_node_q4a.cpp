@@ -120,7 +120,7 @@ void traj_q4a (MatrixXd checkpoint)
     for (int cMessage = 0;cMessage<countMessage;cMessage++) {
 
         MatrixXd A = computeA_constant(checkpoint,cMessage);
-
+        std::cout<<cMessage<<"\n"<<A<<std::endl;
         time_final = checkpoint(cMessage,10);
 
         int totalStep = floor((time_final-time_init) / dt);
@@ -158,7 +158,7 @@ void traj_q4a (MatrixXd checkpoint)
 
         time_init = time_final;
         updateSize = traj_points.rows(); // update the current rows of points
-        //std::cout<<traj_points<<std::endl;
+
     }
 }
 

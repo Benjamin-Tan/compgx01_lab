@@ -137,6 +137,7 @@ void traj_q4b (MatrixXd checkpoint, YoubotIkine *youbot_ikine)
 
 }
 
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "youbot_traj_4b");
