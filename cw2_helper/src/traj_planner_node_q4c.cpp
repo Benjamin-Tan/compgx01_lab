@@ -12,10 +12,12 @@
 // testing
 #include <inverse_kinematics/YoubotKDL.h>
 
+
 trajectory_msgs::JointTrajectoryPoint traj_pt;
 MatrixXd traj_points_jointSpace;
-MatrixXd obstacle_centerPosition;
 
+// obstacle position in matrix (row,column) => (x,y,z ; 1-12 points);
+MatrixXd unitBox1_position,unitBox2_position,unitCyl0_position,unitCyl1_position;
 
 MatrixXd get_checkpoint()
 {
@@ -48,16 +50,12 @@ MatrixXd get_checkpoint()
             p(countMessage,1) = targetPosition.y;
             p(countMessage,2) = targetPosition.z;
 
-            std::cout<<"\n"<<p<<std::endl;
+//            std::cout<<"\n"<<p<<std::endl;
         }
         countMessage++;
-
     }
-
     bag.close();
-
     return p;
-
 }
 
 void traj_q4c (MatrixXd checkpoint,YoubotIkine youbot_kine,YoubotKDL youbot_kdl)
@@ -125,22 +123,9 @@ void traj_q4c (MatrixXd checkpoint,YoubotIkine youbot_kine,YoubotKDL youbot_kdl)
 //    }
 
 }
-
-void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
-    // scalar parameters
-    MatrixXd force_att(3,5),force_rep(3,5);
-    Matrix4d T_init,T_final;
-    VectorXd current_joint_position(5);
-    double zeta, eta; // scalar for att and rep
-    double d,rho; // threshold distance for att and rep
-    double alpha; //scalar for the torque
-
-    d   = 2;
-    rho = 2;
-    alpha = 1;
-
+void compute_obstaclePosition(YoubotIkine youbot_kine){
     /*========================== obstacle declaration (dimension) ==================================*/
-    MatrixXd unitBox1_position,unitBox2_position,unitCyl0_position,unitCyl1_position;
+
     Vector3d unitBox0,unitBox1,unitBox2; // (x,y,z) vector
     Vector2d unitCyl0, unitCyl1; // (radius, length) vector
     unitBox0 << 1,1,0.069438;
@@ -149,7 +134,7 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     unitCyl0 << 0.05, 0.08;
     unitCyl1 << 0.06, 0.14;
 
-    
+
     // unitbox0 has no effect, hence not computing
     unitBox1_position.resize(3,12);
     // -x
@@ -352,6 +337,27 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     unitCyl1_position(1,11) = youbot_kine.obstacle_position(4,1) - unitCyl1(0); // y
     unitCyl1_position(2,11) = youbot_kine.obstacle_position(4,2) - unitCyl1(1)/2; // z
     /*========================== end of obstacle declaration (dimension) ==================================*/
+}
+
+void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
+    // scalar parameters
+    MatrixXd force_att(3,5),force_rep(3,5);
+    Matrix4d T_init,T_final;
+    VectorXd current_joint_position(5);
+    double zeta, eta; // scalar for att and rep
+    double d,rho; // threshold distance for att and rep
+    double alpha; //scalar for the torque
+
+    d   = 2;
+    rho = 2;
+    alpha = 1;
+
+    // compute all the obstacle coordinates
+    compute_obstaclePosition(youbot_kine);
+//    std::cout<<unitBox1_position<<std::endl;
+//    std::cout<<unitBox2_position<<std::endl;
+//    std::cout<<unitCyl0_position<<std::endl;
+//    std::cout<<unitCyl1_position<<std::endl;
     int countPoints=traj_points_jointSpace.rows();
 
     // loop through each message point (9 checkpoint)
@@ -386,7 +392,7 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
                 T_init = youbot_kine.forward_kinematics(current_joint_position,i);
                 o_init = T_init.block(0,3,3,1);
 
-                // compute attractive force
+                // compute attractive force==============================
                 double difference_o = (o_init-o_final).norm();
 
                 if (difference_o <= d)
@@ -394,15 +400,53 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
                 else
                     force_att.block(0,i,3,1)= -d*zeta*(o_init - o_final)/difference_o;
 
-                // compute repulsive force
-//                double different_o_obstacle =
-            } // end if of i loop (each joint)
+                // compute repulsive force================================
+
+                // find the nearest obstacle
+                MatrixXd checkDistance_obstacle(4,12);
+
+                for (int k=0; k<12; k++){
+                    checkDistance_obstacle(0,k) = (o_init-unitBox1_position.block(0,k,3,1)).norm();
+                    checkDistance_obstacle(1,k) = (o_init-unitBox2_position.block(0,k,3,1)).norm();
+                    checkDistance_obstacle(2,k) = (o_init-unitCyl0_position.block(0,k,3,1)).norm();
+                    checkDistance_obstacle(3,k) = (o_init-unitCyl1_position.block(0,k,3,1)).norm();
+                }
+                // look for the smallest distance
+                MatrixXf::Index minRow,minCol;
+                double shortestDistance_obstacle = checkDistance_obstacle.minCoeff(&minRow,&minCol);
+
+                std::cout<<shortestDistance_obstacle<<" "<<minRow<<" "<<minCol<<"\n"<<std::endl;
+                std::cout<<"\n"<<std::endl;
+
+                if (shortestDistance_obstacle<=rho){
+                    if (minRow==0){ //box 1
+                        force_rep.block(0,i,3,1)= 0.5*eta*(1/shortestDistance_obstacle-1/rho)* \
+                            1/pow(shortestDistance_obstacle,2) * (o_init-unitBox1_position.block(0,minCol,3,1))/shortestDistance_obstacle;
+                    }
+                    else if (minRow==1){ //box 2
+                        force_rep.block(0,i,3,1)= 0.5*eta*(1/shortestDistance_obstacle-1/rho)* \
+                            1/pow(shortestDistance_obstacle,2) * (o_init-unitBox2_position.block(0,minCol,3,1))/shortestDistance_obstacle;
+                    }
+                    else if (minRow==2){ //cyl 0
+                        force_rep.block(0,i,3,1)= 0.5*eta*(1/shortestDistance_obstacle-1/rho)* \
+                            1/pow(shortestDistance_obstacle,2) * (o_init-unitCyl0_position.block(0,minCol,3,1))/shortestDistance_obstacle;
+                    } else{ //cyl 1
+                        force_rep.block(0,i,3,1)= 0.5*eta*(1/shortestDistance_obstacle-1/rho)* \
+                            1/pow(shortestDistance_obstacle,2) * (o_init-unitCyl1_position.block(0,minCol,3,1))/shortestDistance_obstacle;
+                    }
+
+                } else
+                    force_rep.block(0,i,3,1)<< 0,0,0;
+
+                // find jacobian ==================================
+
+            } // end for i loop (each joint)
 
 
-        }
+        }// end for cStep loop
 
 
-    }
+    }// end for cPoint loop
 
 
 

@@ -25,7 +25,7 @@ public:
 
     void init();
     void joint_state_callback(const sensor_msgs::JointState::ConstPtr &q);
-    MatrixXd get_jacobian(Eigen::VectorXd current_pose);
+    MatrixXd get_jacobian(Eigen::VectorXd current_pose,int k);
     VectorXd inverse_kinematics_closed(Eigen::Matrix4d desired_pose);
     VectorXd inverse_kinematics_jac(Eigen::VectorXd desired_pose_vec);
     Matrix4d forward_kinematics(Eigen::VectorXd current_joint_position, int count);

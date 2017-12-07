@@ -34,7 +34,7 @@ void YoubotIkine::obstacle_callback(const gazebo_msgs::LinkStates::ConstPtr &w){
 }
 
 
-MatrixXd YoubotIkine::get_jacobian(VectorXd current_pose)
+MatrixXd YoubotIkine::get_jacobian(VectorXd current_pose,int k)
 {
     //Add jacobian code. (without using KDL libraries)
     Matrix4d forwardTransform_1 = forward_kinematics(current_pose,1);
@@ -62,11 +62,41 @@ MatrixXd YoubotIkine::get_jacobian(VectorXd current_pose)
     }
 
     // Compute Jacobian Matrix
-    jacV1 = z0.cross(o5-o0);
-    jacV2 = z1.cross(o5-o1);
-    jacV3 = z2.cross(o5-o2);
-    jacV4 = z3.cross(o5-o3);
-    jacV5 = z4.cross(o5-o4);
+    if (k==1){
+        jacV1 = z0.cross(o1-o0);
+        jacV2 << 0,0,0;
+        jacV3 << 0,0,0;
+        jacV4 << 0,0,0;
+        jacV5 << 0,0,0;
+    }
+    else if (k==2){
+        jacV1 = z0.cross(o2-o0);
+        jacV2 = z1.cross(o2-o1);
+        jacV3 << 0,0,0;
+        jacV4 << 0,0,0;
+        jacV5 << 0,0,0;
+    }
+    else if (k==3){
+        jacV1 = z0.cross(o3-o0);
+        jacV2 = z1.cross(o3-o1);
+        jacV3 = z2.cross(o3-o2);
+        jacV4 << 0,0,0;
+        jacV5 << 0,0,0;
+    }
+    else if (k==4){
+        jacV1 = z0.cross(o4-o0);
+        jacV2 = z1.cross(o4-o1);
+        jacV3 = z2.cross(o4-o2);
+        jacV4 = z3.cross(o4-o3);
+        jacV5 << 0,0,0;
+    }
+    else{
+        jacV1 = z0.cross(o5-o0);
+        jacV2 = z1.cross(o5-o1);
+        jacV3 = z2.cross(o5-o2);
+        jacV4 = z3.cross(o5-o3);
+        jacV5 = z4.cross(o5-o4);
+    }
 
     jacW1 = z0; jacW2 = z1; jacW3 = z2; jacW4 = z3; jacW5 = z4;
 
@@ -251,7 +281,7 @@ VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
         Matrix4d previous_pose = forward_kinematics(previous_joint_position,5);
         VectorXd previous_pose_vec = rotationMatrix_Vector(previous_pose);
 
-        MatrixXd jacobMat = get_jacobian(previous_joint_position);
+        MatrixXd jacobMat = get_jacobian(previous_joint_position,5);
 
         desired_joint_position = previous_joint_position + lambda*jacobMat.transpose()*(desired_pose_vec - previous_pose_vec);
 
