@@ -37,11 +37,11 @@ void YoubotIkine::obstacle_callback(const gazebo_msgs::LinkStates::ConstPtr &w){
 MatrixXd YoubotIkine::get_jacobian(VectorXd current_pose,int k)
 {
     //Add jacobian code. (without using KDL libraries)
-    Matrix4d forwardTransform_1 = forward_kinematics(current_pose,1);
-    Matrix4d forwardTransform_2 = forward_kinematics(current_pose,2);
-    Matrix4d forwardTransform_3 = forward_kinematics(current_pose,3);
-    Matrix4d forwardTransform_4 = forward_kinematics(current_pose,4);
-    Matrix4d forwardTransform_5 = forward_kinematics(current_pose,5);
+    Matrix4d forwardTransform_1 = forward_kinematics(current_pose,0);
+    Matrix4d forwardTransform_2 = forward_kinematics(current_pose,1);
+    Matrix4d forwardTransform_3 = forward_kinematics(current_pose,2);
+    Matrix4d forwardTransform_4 = forward_kinematics(current_pose,3);
+    Matrix4d forwardTransform_5 = forward_kinematics(current_pose,4);
 
     Vector3d z0(0,0,1),z1,z2,z3,z4;
     Vector3d o0(0,0,0),o1,o2,o3,o4,o5;
@@ -62,28 +62,28 @@ MatrixXd YoubotIkine::get_jacobian(VectorXd current_pose,int k)
     }
 
     // Compute Jacobian Matrix
-    if (k==1){
+    if (k==0){
         jacV1 = z0.cross(o1-o0);
         jacV2 << 0,0,0;
         jacV3 << 0,0,0;
         jacV4 << 0,0,0;
         jacV5 << 0,0,0;
     }
-    else if (k==2){
+    else if (k==1){
         jacV1 = z0.cross(o2-o0);
         jacV2 = z1.cross(o2-o1);
         jacV3 << 0,0,0;
         jacV4 << 0,0,0;
         jacV5 << 0,0,0;
     }
-    else if (k==3){
+    else if (k==2){
         jacV1 = z0.cross(o3-o0);
         jacV2 = z1.cross(o3-o1);
         jacV3 = z2.cross(o3-o2);
         jacV4 << 0,0,0;
         jacV5 << 0,0,0;
     }
-    else if (k==4){
+    else if (k==3){
         jacV1 = z0.cross(o4-o0);
         jacV2 = z1.cross(o4-o1);
         jacV3 = z2.cross(o4-o2);
@@ -278,7 +278,7 @@ VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
     float lambda=0.2;
 
     for (int k=0;k<100000;k++){
-        Matrix4d previous_pose = forward_kinematics(previous_joint_position,5);
+        Matrix4d previous_pose = forward_kinematics(previous_joint_position,4);
         VectorXd previous_pose_vec = rotationMatrix_Vector(previous_pose);
 
         MatrixXd jacobMat = get_jacobian(previous_joint_position,5);
@@ -318,7 +318,8 @@ Matrix4d YoubotIkine::forward_kinematics(VectorXd current_joint_position,int cou
 
     VectorXd theta(5);
     for (int i = 0; i < 5; i++)
-            theta(i) = current_joint_position(i);
+//            theta(i) = current_joint_position(i);
+        theta(i) = DH_params[i][3]-current_joint_position(i);
 
     T_01 << cos(theta(0)), -sin(theta(0)) * cos(DH_params[0][1]),  sin(theta(0)) * sin(DH_params[0][1]), DH_params[0][0] * cos(theta(0)),
             sin(theta(0)),  cos(theta(0)) * cos(DH_params[0][1]), -cos(theta(0)) * sin(DH_params[0][1]), DH_params[0][0] * sin(theta(0)),
@@ -341,13 +342,13 @@ Matrix4d YoubotIkine::forward_kinematics(VectorXd current_joint_position,int cou
                         0,                  sin(DH_params[4][1]),                  cos(DH_params[4][1]),                 DH_params[4][2],
                         0,                                     0,                                     0,                               1;
 
-    if (count==1)
+    if (count==0)
         T_05 = T_01;
-    else if (count==2)
+    else if (count==1)
         T_05 = T_01 * T_12;
-    else if (count==3)
+    else if (count==2)
         T_05 = T_01 * T_12 * T_23;
-    else if (count==4)
+    else if (count==3)
         T_05 = T_01 * T_12 * T_23 * T_34;
     else
         T_05 = T_01 * T_12 * T_23 * T_34 * T_45;
