@@ -364,10 +364,10 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     double epsilon; // convergence criteria
 
     zeta = 0.8;
-    eta = 0.2;
-    d   = 0.2;
-    rho = 0.2;
-    alpha = 0.5;
+    eta = 0.5;
+    d   = 1.5;
+    rho = 0.1;
+    alpha = 0.1;
     epsilon = 0.01;
 
     // compute all the obstacle coordinates
@@ -467,14 +467,14 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
                                          jacobian_o.transpose()*force_rep.block(0,i,3,1);
 
 
-                std::cout<<"\nDEBUGGING!!!  "<<i<<"\n"<<std::endl;
-                std::cout<<"Jacobian_o \n"<<jacobian_o<<"\n"<<std::endl;
-                std::cout<<"Attractive: \n"<<force_att<<"\n"<<std::endl;
-                std::cout<<"Repulsive:  \n"<<force_rep<<"\n"<<std::endl;
-                std::cout<<"Torque: \n"<<tau_q<<"\n"<<std::endl;
-                std::cout<<"Init_o: \n"<<o_init<<"\n"<<std::endl;
-                std::cout<<"Final_o:\n"<<o_final<<"\n"<<std::endl;
-                std::cout<<"\n end debug\n"<<std::endl;
+//                std::cout<<"\nDEBUGGING!!!  "<<i<<"\n"<<std::endl;
+//                std::cout<<"Jacobian_o \n"<<jacobian_o<<"\n"<<std::endl;
+//                std::cout<<"Attractive: \n"<<force_att<<"\n"<<std::endl;
+//                std::cout<<"Repulsive:  \n"<<force_rep<<"\n"<<std::endl;
+//                std::cout<<"Torque: \n"<<tau_q<<"\n"<<std::endl;
+//                std::cout<<"Init_o: \n"<<o_init<<"\n"<<std::endl;
+//                std::cout<<"Final_o:\n"<<o_final<<"\n"<<std::endl;
+//                std::cout<<"\n end debug\n"<<std::endl;
             } // end for i loop (each joint)
 
             // sum all of the tau_q to create 5x1 vector
@@ -495,6 +495,9 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
             final_q = traj_points_jointSpace.block(cPoints,0,1,5).transpose();
 
             double difference_in_q = (current_q - final_q).norm();
+
+            std::cout<<"Init_q: \n"<<current_q<<"\n"<<std::endl;
+            std::cout<<"Final_q:\n"<<final_q<<"\n"<<std::endl;
             std::cout<<"\nDifference: "<<difference_in_q<<" ... "<<cStep<<std::endl;
 
             if ( difference_in_q < epsilon ){

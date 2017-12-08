@@ -106,7 +106,7 @@ void traj_q4a (MatrixXd checkpoint)
     // Converts the checkpoint matrix into trajectory point messages using cubic spline
 
     double time_init, time_final;
-    double dt = 0.5; // 0.5 seconds
+    double dt = 0.1; // 0.5 seconds
 
     int countMessage = checkpoint.rows();
     int updateSize = 0;
@@ -189,9 +189,9 @@ int main(int argc, char **argv)
                 traj_pt.positions.push_back(traj_points(cPoints,i));
                 traj_pt.velocities.push_back(traj_points(cPoints,i+5));
             }
-            youbot_kine.publish_trajectory(traj_pt,5e8);
+            youbot_kine.publish_trajectory(traj_pt,1e8);
 
-            ros::Duration(0.5).sleep();
+            ros::Duration(0.1).sleep();
             std::cout<<"after publish\n"<<std::endl;
 
             ros::spinOnce();

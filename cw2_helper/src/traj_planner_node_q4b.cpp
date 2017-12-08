@@ -15,14 +15,9 @@
 trajectory_msgs::JointTrajectoryPoint traj_pt;
 MatrixXd traj_points;
 
-//MatrixXd get_checkpoint(YoubotKDL *youbot_kine)
-MatrixXd get_checkpoint(YoubotIkine *youbot_kine)
+MatrixXd get_checkpoint()
 {
     rosbag::Bag bag;
-
-    YoubotIkine youbotKine;
-//    YoubotKDL youbotKine;
-    youbotKine = *youbot_kine;
 
     std::vector<std::string> topics;
     MatrixXd p;
@@ -70,12 +65,11 @@ MatrixXd get_checkpoint(YoubotIkine *youbot_kine)
 
 }
 
-void traj_q4b (MatrixXd checkpoint, YoubotIkine *youbot_ikine)
+void traj_q4b (MatrixXd checkpoint, YoubotIkine youbot_kine)
 {
     // Do something
     // Converts the checkpoint matrix into trajectory point messages
-    YoubotIkine youbot_kine;
-    youbot_kine = *youbot_ikine;
+
     double time_init=0, time_final;
     double dt;
 
@@ -109,8 +103,11 @@ void traj_q4b (MatrixXd checkpoint, YoubotIkine *youbot_ikine)
         cur_T_mat = youbot_kine.vectorQuat_rotationMat(cur_T);
         final_T_mat=youbot_kine.vectorQuat_rotationMat(final_T);
 
+        std::cout<<cur_T_mat<<"\n\n"<<final_T_mat<<std::endl;
+
         double cTime = 0;
-        for (int cStep=0; cStep<totalStep; cStep++){
+        int cStep=0;
+        for (cStep=0; cStep<totalStep; cStep++){
 
             sol_T_mat = cur_T_mat*((cur_T_mat.inverse()*final_T_mat).log()*cTime).exp();
             sol_T = youbot_kine.rotationMatrix_Vector(sol_T_mat);
@@ -118,19 +115,21 @@ void traj_q4b (MatrixXd checkpoint, YoubotIkine *youbot_ikine)
             traj_points.block(cStep + updateSize,0,1,6) = sol_T.transpose();
             traj_points(cStep + updateSize,6) = dt;
             cTime+=dt;
-            // compute last time step
-            if (cMessage == 9){
-                traj_points.conservativeResize(updateSize + totalStep + 1 , 7);
-
-                sol_T_mat = cur_T_mat*((cur_T_mat.inverse()*final_T_mat).log()*cTime).exp();
-                sol_T = youbot_kine.rotationMatrix_Vector(sol_T_mat);
-
-                traj_points.block(cStep + updateSize + 1,0,1,6) = sol_T.transpose();
-                traj_points(cStep + updateSize + 1,6) = dt;
-            }
 
         }
+        // compute last time step
+        if (cMessage == 9){
+            traj_points.conservativeResize(updateSize + totalStep + 1 , 7);
 
+            sol_T_mat = cur_T_mat*((cur_T_mat.inverse()*final_T_mat).log()*1).exp();
+            sol_T = youbot_kine.rotationMatrix_Vector(sol_T_mat);
+
+            traj_points.block(totalStep + updateSize,0,1,6) = sol_T.transpose();
+            traj_points(totalStep + updateSize,6) = dt;
+            std::cout<<"solution:\n"<<sol_T_mat<<"\n"<<std::endl;
+            std::cout<<"trajpts: \n"<<traj_points<<"\n"<<std::endl;
+            std::cout<<"  "<<std::endl;
+        }
         time_init = time_final;
         updateSize = traj_points.rows();
     }
@@ -144,42 +143,14 @@ int main(int argc, char **argv)
 
     YoubotIkine youbot_kine;
 
-    // Remarks: both jacobian are correct magnitude, but different in signs
-    // testing start ==================================================================
-    YoubotKDL youbot_kdl_test;
-    youbot_kdl_test.init();
-
-/*    KDL::Jacobian trueJac = youbot_kdl_test.get_jacobian(youbot_kdl_test.current_joint_position);
-//    std::cout << "True Jac\n";
-//    ROS_INFO("%f %f %f %f %f\n",trueJac(0,0),trueJac(0,1),trueJac(0,2),trueJac(0,3),trueJac(0,4));
-//    ROS_INFO("%f %f %f %f %f\n",trueJac(1,0),trueJac(1,1),trueJac(1,2),trueJac(1,3),trueJac(1,4));
-//    ROS_INFO("%f %f %f %f %f\n",trueJac(2,0),trueJac(2,1),trueJac(2,2),trueJac(2,3),trueJac(2,4));
-//    ROS_INFO("%f %f %f %f %f\n",trueJac(3,0),trueJac(3,1),trueJac(3,2),trueJac(3,3),trueJac(3,4));
-//    ROS_INFO("%f %f %f %f %f\n",trueJac(4,0),trueJac(4,1),trueJac(4,2),trueJac(4,3),trueJac(4,4));
-//    ROS_INFO("%f %f %f %f %f\n\n",trueJac(5,0),trueJac(5,1),trueJac(5,2),trueJac(5,3),trueJac(5,4));
-
-    KDL::Frame current_pose = youbot_kdl_test.forward_kinematics(youbot_kdl_test.current_joint_position, youbot_kdl_test.current_pose);
-
-    geometry_msgs::TransformStamped trans;
-
-    trans = tf2::kdlToTransform(current_pose);
-    trans.header.stamp = ros::Time::now();
-    trans.header.frame_id = "base_link";
-    trans.child_frame_id = "arm_end_effector";
-
-//    ROS_INFO("Translate: %f %f %f\n",trans.transform.translation.x,trans.transform.translation.y,trans.transform.translation.z);
-//    ROS_INFO("Rotation : %f %f %f %f\n\n",trans.transform.rotation.x,trans.transform.rotation.y,trans.transform.rotation.z,trans.transform.rotation.w);
-
-
-    KDL::JntArray jointSol = youbot_kdl_test.inverse_kinematics_closed(current_pose);
-    ROS_INFO("True: %f %f %f %f %f\n\n",jointSol.data(0),jointSol.data(1),jointSol.data(2),jointSol.data(3),jointSol.data(4));
-    // testing end ========================================================================*/
+    YoubotKDL youbot_kdl;
+    youbot_kdl.init();
 
     youbot_kine.init();
 
-    MatrixXd check_point_matrix = get_checkpoint(&youbot_kine);
+    MatrixXd check_point_matrix = get_checkpoint();
 
-    traj_q4b(check_point_matrix,&youbot_kine);
+    traj_q4b(check_point_matrix,youbot_kine);
     int countPoints=traj_points.rows();
     int cPoints = 0;
     std::cout<<countPoints<<std::endl;
@@ -196,7 +167,7 @@ int main(int argc, char **argv)
 
             // KDL
             KDL::Frame desiredPose_KDL = youbot_kine.poseMatrix_kdlFrame(desiredPose);
-            KDL::JntArray desiredJointPosition = youbot_kdl_test.inverse_kinematics_closed(desiredPose_KDL);
+            KDL::JntArray desiredJointPosition = youbot_kdl.inverse_kinematics_closed(desiredPose_KDL);
 //
 //            std::cout<<desiredJointPosition.data.transpose()<<std::endl;
 
@@ -205,7 +176,7 @@ int main(int argc, char **argv)
 //                traj_pt.positions.push_back(desiredJointPosition(i));
                 traj_pt.positions.push_back(desiredJointPosition.data(i));
             }
-            double dt = traj_points(cPoints, 6);
+            double dt = check_point_matrix(9,7)/countPoints;//traj_points(cPoints, 6);
             youbot_kine.publish_trajectory(traj_pt, dt * 1e9);
 
             ros::Duration(dt).sleep();
