@@ -358,14 +358,14 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     double difference_q_old_1,difference_q_old_2;
     int count_1=0, count_2=0;
 
-    double zeta, eta; // scalar for att and rep
+    VectorXd zeta(5), eta(5); // scalar for att and rep
     double d,rho; // threshold distance for att and rep
     double alpha; //scalar for the torque
     double epsilon; // convergence criteria
 
-    zeta = 0.8;
-    eta = 0.5;
-    d   = 1.5;
+    zeta << 3, 3, 3, 3, 3;
+    eta  << 0.4, 0.2, 0.2, 0.5, 0.2;
+    d   = 0.5;
     rho = 0.1;
     alpha = 0.1;
     epsilon = 0.01;
@@ -417,9 +417,9 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
                 double difference_o = (o_init-o_final).norm();
 
                 if (difference_o <= d)
-                    force_att.block(0,i,3,1)= -zeta*(o_init - o_final);
+                    force_att.block(0,i,3,1)= -zeta(i)*(o_init - o_final);
                 else
-                    force_att.block(0,i,3,1)= -d*zeta*(o_init - o_final)/difference_o;
+                    force_att.block(0,i,3,1)= -d*zeta(i)*(o_init - o_final)/difference_o;
 
                 // compute repulsive force================================
 
@@ -432,6 +432,9 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
                     checkDistance_obstacle(2,k) = (o_init-unitCyl0_position.block(0,k,3,1)).norm();
                     checkDistance_obstacle(3,k) = (o_init-unitCyl1_position.block(0,k,3,1)).norm();
                 }
+//
+//                std::cout<<checkDistance_obstacle<<std::endl;
+//                std::cout<<"\n"<<std::endl;
                 // look for the smallest distance
                 MatrixXf::Index minRow,minCol;
                 double shortestDistance_obstacle = checkDistance_obstacle.minCoeff(&minRow,&minCol);
@@ -441,18 +444,18 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
 
                 if (shortestDistance_obstacle<=rho){
                     if (minRow==0){ //box 1
-                        force_rep.block(0,i,3,1)= eta*(1/shortestDistance_obstacle-1/rho)* \
+                        force_rep.block(0,i,3,1)= eta(i)*(1/shortestDistance_obstacle-1/rho)* \
                             1/pow(shortestDistance_obstacle,2) * (o_init-unitBox1_position.block(0,minCol,3,1))/shortestDistance_obstacle;
                     }
                     else if (minRow==1){ //box 2
-                        force_rep.block(0,i,3,1)= eta*(1/shortestDistance_obstacle-1/rho)* \
+                        force_rep.block(0,i,3,1)= eta(i)*(1/shortestDistance_obstacle-1/rho)* \
                             1/pow(shortestDistance_obstacle,2) * (o_init-unitBox2_position.block(0,minCol,3,1))/shortestDistance_obstacle;
                     }
                     else if (minRow==2){ //cyl 0
-                        force_rep.block(0,i,3,1)= eta*(1/shortestDistance_obstacle-1/rho)* \
+                        force_rep.block(0,i,3,1)= eta(i)*(1/shortestDistance_obstacle-1/rho)* \
                             1/pow(shortestDistance_obstacle,2) * (o_init-unitCyl0_position.block(0,minCol,3,1))/shortestDistance_obstacle;
                     } else{ //cyl 1
-                        force_rep.block(0,i,3,1)= eta*(1/shortestDistance_obstacle-1/rho)* \
+                        force_rep.block(0,i,3,1)= eta(i)*(1/shortestDistance_obstacle-1/rho)* \
                             1/pow(shortestDistance_obstacle,2) * (o_init-unitCyl1_position.block(0,minCol,3,1))/shortestDistance_obstacle;
                     }
 
@@ -496,6 +499,9 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
 
             double difference_in_q = (current_q - final_q).norm();
 
+            std::cout<<"Init_o: \n"<<youbot_kine.forward_kinematics(current_q,4)<<"\n"<<std::endl;
+            std::cout<<"Final_o: \n"<<youbot_kine.forward_kinematics(final_q,4)<<"\n"<<std::endl;
+            std::cout<<"\nDifference_o: "<<(youbot_kine.forward_kinematics(current_q,4).block(0,3,3,1)-youbot_kine.forward_kinematics(final_q,4).block(0,3,3,1)).norm()<<"\n"<<std::endl;
             std::cout<<"Init_q: \n"<<current_q<<"\n"<<std::endl;
             std::cout<<"Final_q:\n"<<final_q<<"\n"<<std::endl;
             std::cout<<"\nDifference: "<<difference_in_q<<" ... "<<cStep<<std::endl;

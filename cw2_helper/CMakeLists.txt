@@ -178,7 +178,11 @@ add_executable(traj_planner_node_q4d
         ${HEADER_FILES}
         )
 
-
+add_executable(traj_planner_node_q_extra
+        src/traj_planner_node_q_extra.cpp
+        src/YoubotIkine.cpp
+        ${HEADER_FILES}
+        )
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -203,6 +207,10 @@ target_link_libraries(traj_planner_node_q4c
         #  ${orocos_kdl_LIBRARIES}
         )
 target_link_libraries(traj_planner_node_q4d
+        ${catkin_LIBRARIES}
+        #  ${orocos_kdl_LIBRARIES}
+        )
+target_link_libraries(traj_planner_node_q_extra
         ${catkin_LIBRARIES}
         #  ${orocos_kdl_LIBRARIES}
         )

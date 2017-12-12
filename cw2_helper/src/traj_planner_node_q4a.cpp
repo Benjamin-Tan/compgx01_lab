@@ -141,7 +141,7 @@ void traj_q4a (MatrixXd checkpoint)
 
             cTime+= dt;
             // compute the last step
-            if (cMessage==9){
+            if (cMessage==9 && cStep==totalStep-1){
 
                 traj_points.conservativeResize(updateSize + totalStep + 1, 11); //change the size of matrix without affecting old values
 
