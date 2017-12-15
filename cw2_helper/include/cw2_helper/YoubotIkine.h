@@ -16,12 +16,15 @@ private:
     MatrixXd jacobian;
 
     ros::Subscriber subscriber_obstacle;
+    ros::Subscriber subscriber_obstacle_extra;
+
     ros::Publisher publisher;
 
 public:
 
     VectorXd current_joint_position;
     MatrixXd obstacle_position;
+    MatrixXd obstacle_position_extra;
 
     void init();
     void joint_state_callback(const sensor_msgs::JointState::ConstPtr &q);
@@ -40,6 +43,7 @@ public:
     Matrix4d vectorQuat_rotationMat(VectorXd pose);
 
     void obstacle_callback(const gazebo_msgs::LinkStates::ConstPtr &w);
+    void obstacle_callback_extra(const gazebo_msgs::LinkStates::ConstPtr &w);
 };
 
 #endif //CW2_HELPER_YOUBOTMANUAL_H

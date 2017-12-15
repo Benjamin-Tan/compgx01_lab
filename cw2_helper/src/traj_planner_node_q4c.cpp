@@ -82,7 +82,6 @@ void traj_q4c (MatrixXd checkpoint,YoubotIkine youbot_kine,YoubotKDL youbot_kdl)
         std::cout<<youbot_kdl.forward_kinematics(desiredJointPosition,desiredPose_KDL)<<"\n diy"<<std::endl;
         std::cout<<youbot_kine.forward_kinematics(desiredJointPosition.data,4)<<std::endl;
         //std::cout<<desiredJointPosition.data<<std::endl;
-
         traj_points_jointSpace.block(c,0,1,5) = desiredJointPosition.data.transpose();
 
     }
@@ -363,7 +362,7 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     double alpha; //scalar for the torque
     double epsilon; // convergence criteria
 
-    zeta << 3, 3, 3, 3, 3;
+    zeta << 0.8,0.8,0.8,0.8,0.8;
     eta  << 0.4, 0.2, 0.2, 0.5, 0.2;
     d   = 0.5;
     rho = 0.1;
@@ -380,7 +379,7 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     for (int cPoints=0;cPoints<countPoints;cPoints++){
         // gradient descent algorithm
         int cStep;
-        for (cStep=0; cStep < 1000000000; cStep++){
+        for (cStep=0; cStep < 10000000; cStep++){
 
             // initialise to zero
             force_att.setZero();
@@ -397,7 +396,7 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
                     if (cPoints==0){
                         o_init << 0,0,0;
                         T_final = youbot_kine.forward_kinematics(traj_points_jointSpace.row(cPoints).transpose(),i);
-                        o_final = T_final.block(0,3,3,1); // extra last column of T matrix
+                        o_final = T_final.block(0,3,3,1); // extract last column of T matrix
                     }
                     else{
 
@@ -482,8 +481,8 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
 
             // sum all of the tau_q to create 5x1 vector
             tau_q_sum = tau_q.rowwise().sum();
-//            std::cout<<tau_q<<"\n sum of tau q\n"<<tau_q_sum<<std::endl;
-//            std::cout<<" "<<std::endl;
+            std::cout<<tau_q<<"\n sum of tau q\n"<<tau_q_sum<<std::endl;
+            std::cout<<" "<<std::endl;
 
 
             // main gradient descent algorithm

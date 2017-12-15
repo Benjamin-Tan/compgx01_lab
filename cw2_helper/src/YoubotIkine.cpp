@@ -9,6 +9,7 @@ void YoubotIkine::init()
     subscriber_joint_state = n.subscribe<sensor_msgs::JointState>("/joint_states", 5, &YoubotIkine::joint_state_callback,
                                                                   this);
     subscriber_obstacle = n.subscribe<gazebo_msgs::LinkStates>("/gazebo/link_states",5,&YoubotIkine::obstacle_callback,this);
+    subscriber_obstacle_extra = n.subscribe<gazebo_msgs::LinkStates>("/gazebo/link_states",5,&YoubotIkine::obstacle_callback_extra,this);
 
     current_joint_position.resize(5);
     desired_joint_position.resize(5);
@@ -33,6 +34,21 @@ void YoubotIkine::obstacle_callback(const gazebo_msgs::LinkStates::ConstPtr &w){
     }
 }
 
+void YoubotIkine::obstacle_callback_extra(const gazebo_msgs::LinkStates::ConstPtr &s){
+    obstacle_position_extra.resize(6,7);
+
+    for (int i = 0; i < 6; i++)
+    {
+        obstacle_position_extra(i,0) =s->pose[i+1].position.x;
+        obstacle_position_extra(i,1) =s->pose[i+1].position.y;
+        obstacle_position_extra(i,2) =s->pose[i+1].position.z;
+
+        obstacle_position_extra(i,3) =s->pose[i+1].orientation.x;
+        obstacle_position_extra(i,4) =s->pose[i+1].orientation.y;
+        obstacle_position_extra(i,5) =s->pose[i+1].orientation.z;
+        obstacle_position_extra(i,6) =s->pose[i+1].orientation.w;
+    }
+}
 
 MatrixXd YoubotIkine::get_jacobian(VectorXd current_pose,int k)
 {
@@ -269,15 +285,11 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
 VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
 {
     //Add iterative inverse kinematics code. (without using KDL libraries)
-    VectorXd previous_joint_position(5);
-    // reverse the offset[-pi,pi] to raw [0,2pi];
-    for (int i = 1; i < 5; i++){
-        previous_joint_position(i) = DH_params[i][3] - current_joint_position(i);
-    }
+    VectorXd previous_joint_position = VectorXd::Zero(5);
 
     float lambda=0.2;
 
-    for (int k=0;k<100000;k++){
+    for (int k=0;k<10000000;k++){
         Matrix4d previous_pose = forward_kinematics(previous_joint_position,4);
         VectorXd previous_pose_vec = rotationMatrix_Vector(previous_pose);
 

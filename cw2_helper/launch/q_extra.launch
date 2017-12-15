@@ -25,7 +25,7 @@
 	<!-- Change args value to the correct dataset (q4a = 1, q4b = 2, q4c = 3, q4c = 4, q_extra = 5)-->
 	<node name="trail_node" pkg="youbot_trail_rviz" type="youbot_trail_rviz_node" args="5"/>
 	<!-- Insert your node name here -->
-	<!--node name="youbot_traj_4c" pkg="cw2_helper" type="traj_planner_node_q4c"/-->
+	<node name="youbot_traj_q_extra" pkg="cw2_helper" type="traj_planner_node_q_extra"/>
 	
   <include file="$(find youbot_simulator)/launch/youbot_controller.launch">
     <arg name="trajectory_interface" value="$(arg trajectory_interface)"/>
