@@ -31,6 +31,7 @@ public:
     MatrixXd get_jacobian(Eigen::VectorXd current_pose,int k);
     VectorXd inverse_kinematics_closed(Eigen::Matrix4d desired_pose);
     VectorXd inverse_kinematics_jac(Eigen::VectorXd desired_pose_vec);
+    VectorXd inverse_kinematics_jac_pos(Eigen::Vector3d desired_pose_vec_pos);
     Matrix4d forward_kinematics(Eigen::VectorXd current_joint_position, int count);
     bool check_singularity(VectorXd joint_position);
 
@@ -39,8 +40,9 @@ public:
     Matrix4d rotationVector_Matrix(VectorXd rotationVector);
     VectorXd pose_rotationVec(geometry_msgs::TransformStamped pose);
     Matrix4d pose_rotationMat(geometry_msgs::TransformStamped pose);
-    void publish_trajectory(trajectory_msgs::JointTrajectoryPoint joint_trajectory,int dt);
     Matrix4d vectorQuat_rotationMat(VectorXd pose);
+
+    void publish_trajectory(trajectory_msgs::JointTrajectoryPoint joint_trajectory,int dt);
 
     void obstacle_callback(const gazebo_msgs::LinkStates::ConstPtr &w);
     void obstacle_callback_extra(const gazebo_msgs::LinkStates::ConstPtr &w);

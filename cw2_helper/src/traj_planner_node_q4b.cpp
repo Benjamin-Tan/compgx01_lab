@@ -2,15 +2,12 @@
 #include <cw2_helper/YoubotIkine.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
-#include <trajectory_msgs/JointTrajectory.h>
-#include <geometry_msgs/Point.h>
 
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 
-#include <unsupported/Eigen/MatrixFunctions>
-// testing
 #include <inverse_kinematics/YoubotKDL.h>
+#include <unsupported/Eigen/MatrixFunctions>
 
 trajectory_msgs::JointTrajectoryPoint traj_pt;
 MatrixXd traj_points;
@@ -22,10 +19,6 @@ MatrixXd get_checkpoint()
     std::vector<std::string> topics;
     MatrixXd p;
     p.resize(5,8);
-    //testing
-//    traj_points.resize(5,10);
-    //testing end
-    VectorXd desired_joint_value;
 
     bag.open("/home/benjamintan/catkin_ws/src/compgx01_lab/cw2_helper/bags/data_q4b.bag", rosbag::bagmode::Read);
     topics.push_back(std::string("target_tf"));
@@ -44,13 +37,6 @@ MatrixXd get_checkpoint()
             //Fill in the code to retrieve data from a bag
             targetTF = *j;
 
-            // testing
-//            MatrixXd tf = youbot_kine.pose_rotationMat(targetTF);
-//            KDL::Frame tf_KDL = youbot_kine.poseMatrix_kdlFrame(tf);
-//            KDL::JntArray desiredJointPosition = youbot_kdl.inverse_kinematics_closed(tf_KDL);
-//
-//            traj_points.block(0,countMessage,5,1) =  desiredJointPosition.data;
-            //testing end
             p(countMessage,0) = targetTF.transform.translation.x;
             p(countMessage,1) = targetTF.transform.translation.y;
             p(countMessage,2) = targetTF.transform.translation.z;
@@ -112,13 +98,13 @@ void traj_q4b (MatrixXd checkpoint, YoubotIkine youbot_kine)
         cur_T_mat = youbot_kine.vectorQuat_rotationMat(cur_T);
         final_T_mat=youbot_kine.vectorQuat_rotationMat(final_T);
 
-        std::cout<<cur_T_mat<<"\n\n"<<final_T_mat<<std::endl;
+//        std::cout<<cur_T_mat<<"\n\n"<<final_T_mat<<std::endl;
 
         double cTime = 0;
         int cStep=0;
         for (cStep=0; cStep<totalStep; cStep++){
 
-            sol_T_mat = cur_T_mat*((cur_T_mat.inverse()*final_T_mat).log()*cTime).exp();
+            sol_T_mat = cur_T_mat*(((cur_T_mat.inverse()*final_T_mat).log()*cTime).exp());
             sol_T = youbot_kine.rotationMatrix_Vector(sol_T_mat);
 
             traj_points.block(cStep + updateSize,0,1,6) = sol_T.transpose();
@@ -130,14 +116,14 @@ void traj_q4b (MatrixXd checkpoint, YoubotIkine youbot_kine)
         if (cMessage == 9){
             traj_points.conservativeResize(updateSize + totalStep + 1 , 7);
 
-            sol_T_mat = cur_T_mat*((cur_T_mat.inverse()*final_T_mat).log()*1).exp();
+            sol_T_mat = cur_T_mat*(((cur_T_mat.inverse()*final_T_mat).log()*1).exp());
             sol_T = youbot_kine.rotationMatrix_Vector(sol_T_mat);
 
             traj_points.block(totalStep + updateSize,0,1,6) = sol_T.transpose();
             traj_points(totalStep + updateSize,6) = dt;
-            std::cout<<"solution:\n"<<sol_T_mat<<"\n"<<std::endl;
-            std::cout<<"trajpts: \n"<<traj_points<<"\n"<<std::endl;
-            std::cout<<"  "<<std::endl;
+//            std::cout<<"solution:\n"<<sol_T_mat<<"\n"<<std::endl;
+//            std::cout<<"trajpts: \n"<<traj_points<<"\n"<<std::endl;
+//            std::cout<<"  "<<std::endl;
         }
         time_init = time_final;
         updateSize = traj_points.rows();
@@ -151,10 +137,8 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "youbot_traj_4b");
 
     YoubotIkine youbot_kine;
-
     YoubotKDL youbot_kdl;
     youbot_kdl.init();
-
     youbot_kine.init();
 
     MatrixXd check_point_matrix = get_checkpoint();
@@ -170,29 +154,20 @@ int main(int argc, char **argv)
             std::cout << "start " << cPoints << "\n" << std::endl;
             Matrix4d desiredPose = youbot_kine.rotationVector_Matrix(traj_points.block(cPoints, 0, 1, 6).transpose());
 
-//            VectorXd desiredJointPosition = youbot_kine.inverse_kinematics_closed(desiredPose);
-//            VectorXd desiredJointPosition = youbot_kine.inverse_kinematics_jac(traj_points.block(cPoints,0,1,6).transpose());
-//            std::cout<<desiredJointPosition.transpose()<<std::endl;
-
             // KDL
             KDL::Frame desiredPose_KDL = youbot_kine.poseMatrix_kdlFrame(desiredPose);
             KDL::JntArray desiredJointPosition = youbot_kdl.inverse_kinematics_closed(desiredPose_KDL);
-//
-//            std::cout<<desiredJointPosition.data.transpose()<<std::endl;
 
             traj_pt.positions.clear();
             for (int i = 0; i < 5; i++) {
-//                traj_pt.positions.push_back(desiredJointPosition(i));
                 traj_pt.positions.push_back(desiredJointPosition.data(i));
-//                traj_pt.positions.push_back(traj_points(i,cPoints));
             }
-            double dt = check_point_matrix(9,7)/countPoints;//traj_points(cPoints, 6);
+            double dt = check_point_matrix(9,7)/countPoints;
             youbot_kine.publish_trajectory(traj_pt, dt * 1e9);
 
             ros::Duration(dt).sleep();
             std::cout << "after publish\n" << std::endl;
 
-            std::cout<<youbot_kine.forward_kinematics(desiredJointPosition.data,4)<<"\n"<<std::endl;
             ros::spinOnce();
         }
     }

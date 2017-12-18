@@ -134,30 +134,14 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
     r21 = desired_pose(1,0); r22 = desired_pose(1,1); r23 = desired_pose(1,2); y = desired_pose(1,3);
     r31 = desired_pose(2,0); r32 = desired_pose(2,1); r33 = desired_pose(2,2); z = desired_pose(2,3);
 
+    // compute theta 1
     ik_theta(0) = atan(y/x) + M_PI;
     ik_theta_1(0) = ik_theta(0);
     ik_theta_2(0) = atan(y/x) - M_PI;
     ik_theta_3(0) = ik_theta_2(0);
 
-//    std::cout << "Before "<<ik_theta(0) << std::endl;
-//    ik_theta(0) = DH_params[0][3] - ik_theta(0);
-//    std::cout << "After  "<<ik_theta(0) << std::endl;
-//
-//
-//    // only 1 theta is not correct.
-//    if ((ik_theta(0)>(169*M_PI/180) && ik_theta(0)<(M_PI+169*M_PI/180)) || (ik_theta(0)<(169*M_PI/180) && ik_theta(0)>(M_PI-169*M_PI/180))) {
-//        ik_theta(0) = ik_theta(0) - M_PI;
-//        std::cout << 999 << std::endl;
-//    }
-//    else if ((ik_theta(0)<(-169*M_PI/180) && ik_theta(0)>(-M_PI-169*M_PI/180)) || (ik_theta(0)>(-169*M_PI/180) && ik_theta(0)<(-M_PI+169*M_PI/180))){
-//        ik_theta(0)=ik_theta(0)+M_PI;
-//        std::cout<<666<<std::endl;
-//    }
-//    else
-//        ik_theta(0)=ik_theta(0);
 
-//    std::cout<<r32<<" "<<r31<<" "<<r22<<" "<<r12<<" "<< std::endl;
-// why is this not working? theoretical value
+    // compute theta 5
     double y5 = r21*cos(ik_theta(0)) - r11*sin(ik_theta(0));
     double x5 = r22*cos(ik_theta(0)) - r12*sin(ik_theta(0));
     ik_theta(4) = atan2(y5,x5);
@@ -167,13 +151,8 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
     x5 = r22*cos(ik_theta_2(0)) - r12*sin(ik_theta_2(0));
     ik_theta_2(4) = atan2(y5,x5);
     ik_theta_3(4) = ik_theta_2(4);
-//    std::cout << "Before "<<ik_theta(4) << std::endl;
-//    ik_theta(4) = DH_params[4][3] - ik_theta(4);
-//    std::cout << "After  "<<ik_theta(4) << std::endl;
-    // somehow correct value
-//    ik_theta(4) = DH_params[4][3] -atan2(-r32,r31) - M_PI;
 
-
+    // compute theta 3
     G = pow( -1000*x/cos(ik_theta(0)) - 183*r31/cos(ik_theta(4)) + 33 ,2) + pow(1000*z - 147 - 183*r33,2);
     ik_theta(2) = acos( (G-pow(135,2)-pow(155,2)) / (2*135*155) );
 
@@ -199,7 +178,7 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
     if (std::isnan(ik_theta_3(2)))
         ik_theta_3(2) = -(148)*M_PI/180;
 
-
+    // compute theta 2 and 4
     A = 135*cos(ik_theta(2)) + 155;
     B = 135*sin(ik_theta(2));
     C = -1000*x/cos(ik_theta(0)) + 33 - 183*r31/cos(ik_theta(4));
@@ -228,16 +207,6 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
     ik_theta_3(1) = atan2(C,D) - atan2(B,A);
     ik_theta_3(3) = atan2(r31,r33*cos(ik_theta_3(4))) - ik_theta_3(1) - ik_theta_3(2);
 
-
-
-//    for (int i = 1; i < 5; i++){
-//        ik_theta(i) = DH_params[i][3] - ik_theta(i);
-//        ik_theta_1(i) = DH_params[i][3] - ik_theta_1(i);
-//        ik_theta_2(i) = DH_params[i][3] - ik_theta_2(i);
-//        ik_theta_3(i) = DH_params[i][3] - ik_theta_3(i);
-//    }
-
-
     // Check the joint limits of 1 and 5
     if (ik_theta(0) > 0 && ik_theta(0) < 338*M_PI/180) {
         ik_theta_real(0) = ik_theta(0);
@@ -265,16 +234,11 @@ VectorXd YoubotIkine::inverse_kinematics_closed(Matrix4d desired_pose)
         ik_theta_real(4) = ik_theta_real(4) - 2*M_PI;
 
 
-
-
-
-
-
     std::cout<< "\n"<< ik_theta.transpose()<<std::endl;
     std::cout << ik_theta_1.transpose()<<std::endl;
     std::cout<< ik_theta_2.transpose()<<std::endl;
     std::cout<< ik_theta_3.transpose()<<std::endl;
-//
+
 //    std::cout<<"\nFinal"<<std::endl;
 //    std::cout<<ik_theta_real(0)<<" "<<ik_theta_real(1)<<" "<<ik_theta_real(2)<<" "<<ik_theta_real(3)<<" "<<ik_theta_real(4)<<std::endl;
 
@@ -293,7 +257,7 @@ VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
         Matrix4d previous_pose = forward_kinematics(previous_joint_position,4);
         VectorXd previous_pose_vec = rotationMatrix_Vector(previous_pose);
 
-        MatrixXd jacobMat = get_jacobian(previous_joint_position,5);
+        MatrixXd jacobMat = get_jacobian(previous_joint_position,4);
 
         desired_joint_position = previous_joint_position + lambda*jacobMat.transpose()*(desired_pose_vec - previous_pose_vec);
 
@@ -318,6 +282,46 @@ VectorXd YoubotIkine::inverse_kinematics_jac(VectorXd desired_pose_vec)
 
     }
 
+//    for (int i = 0; i < 5; i++)
+//        desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
+    return desired_joint_position;
+}
+
+VectorXd YoubotIkine::inverse_kinematics_jac_pos(Vector3d desired_pose_vec_pos)
+{
+    //Add iterative inverse kinematics code, disregard the orientation. (without using KDL libraries)
+    VectorXd previous_joint_position = VectorXd::Zero(5);
+
+    float lambda=0.1;
+
+    for (int k=0;k<10000000;k++){
+        Matrix4d previous_pose = forward_kinematics(previous_joint_position,4);
+        VectorXd previous_pose_vec = rotationMatrix_Vector(previous_pose);
+
+        MatrixXd jacobMat = get_jacobian(previous_joint_position,4);
+
+        desired_joint_position = previous_joint_position + lambda*jacobMat.block(0,0,3,5).transpose()*(desired_pose_vec_pos - previous_pose_vec.head(3));
+
+        // re-adjust the limits
+        for (int i=0;i<5; i++){
+            while (desired_joint_position(i)<-M_PI)
+                desired_joint_position(i) = desired_joint_position(i) + 2*M_PI;
+            while (desired_joint_position(i)>=M_PI)
+                desired_joint_position(i) = desired_joint_position(i) - 2*M_PI;
+        }
+
+
+        if ((desired_pose_vec_pos-previous_pose_vec.head(3)).norm() < 0.00001 || check_singularity(desired_joint_position)) {
+            desired_joint_position = previous_joint_position;
+//            for (int i = 0; i < 5; i++)
+//                desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
+            break;
+        }
+
+        previous_joint_position = desired_joint_position;
+
+    }
+//
 //    for (int i = 0; i < 5; i++)
 //        desired_joint_position(i) = DH_params[i][3] - desired_joint_position(i);
     return desired_joint_position;
@@ -373,7 +377,8 @@ Matrix4d YoubotIkine::forward_kinematics(VectorXd current_joint_position,int cou
 bool YoubotIkine::check_singularity(VectorXd joint_position)
 {
     //Add singularity checker. (without using KDL libraries)
-    if ((jacobian.transpose()*jacobian).determinant()<0.0001)
+    MatrixXd jacob = get_jacobian(joint_position,4);
+    if ((jacob.transpose()*jacob).determinant()<0.0000001)
         return 1;
     else
         return 0;

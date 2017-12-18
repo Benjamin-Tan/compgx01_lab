@@ -2,21 +2,17 @@
 #include <cw2_helper/YoubotIkine.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
-#include <trajectory_msgs/JointTrajectory.h>
-#include <geometry_msgs/Point.h>
 
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 
-#include <unsupported/Eigen/MatrixFunctions>
-// testing
 #include <inverse_kinematics/YoubotKDL.h>
 
 
 trajectory_msgs::JointTrajectoryPoint traj_pt;
 MatrixXd traj_points_jointSpace;
 MatrixXd traj_pts_jointSpace_avoidObstacle;
-// obstacle position in matrix (row,column) => (x,y,z ; 1-12 points);
+// obstacle position in matrix (row;column) => (x,y,z ; 1-12 points);
 MatrixXd unitBox1_position,unitBox2_position,unitCyl0_position,unitCyl1_position;
 
 MatrixXd get_checkpoint()
@@ -26,8 +22,6 @@ MatrixXd get_checkpoint()
     std::vector<std::string> topics;
     MatrixXd p;
     p.resize(5,3);
-
-    VectorXd desired_joint_value;
 
     bag.open("/home/benjamintan/catkin_ws/src/compgx01_lab/cw2_helper/bags/data_q4c.bag", rosbag::bagmode::Read);
     topics.push_back(std::string("target_position"));
@@ -68,62 +62,26 @@ void traj_q4c (MatrixXd checkpoint,YoubotIkine youbot_kine,YoubotKDL youbot_kdl)
     traj_points_jointSpace.resize(countMessage,5);
 
     for (int c=0; c<countMessage; c++){
-        Matrix4d desiredPose;
 
-        desiredPose <<  1, 0, 0, checkpoint(c, 0),
-                        0, 1, 0, checkpoint(c, 1),
-                        0, 0, 1, checkpoint(c, 2),
-                        0, 0, 0, 1;
+        Matrix4d desiredPose;
+        desiredPose << 1,0,0,checkpoint(c,0),
+                0,1,0,checkpoint(c,1),
+                0,0,1,checkpoint(c,2),
+                0,0,0,1;
 
         KDL::Frame desiredPose_KDL = youbot_kine.poseMatrix_kdlFrame(desiredPose);
         KDL::JntArray desiredJointPosition = youbot_kdl.inverse_kinematics_closed(desiredPose_KDL);
 
-        std::cout<<desiredPose<<"\n forward"<<std::endl;
-        std::cout<<youbot_kdl.forward_kinematics(desiredJointPosition,desiredPose_KDL)<<"\n diy"<<std::endl;
-        std::cout<<youbot_kine.forward_kinematics(desiredJointPosition.data,4)<<std::endl;
-        //std::cout<<desiredJointPosition.data<<std::endl;
+//        std::cout<<desiredPose<<std::endl;
+//        std::cout<<youbot_kdl.forward_kinematics(desiredJointPosition,desiredPose_KDL)<<"\n diy"<<std::endl;
+//        std::cout<<youbot_kine.forward_kinematics(desiredJointPosition.data,4)<<std::endl;
+//        std::cout<<desiredJointPosition.data<<std::endl;
+
         traj_points_jointSpace.block(c,0,1,5) = desiredJointPosition.data.transpose();
 
     }
-    std::cout<<traj_points_jointSpace<<std::endl;
-    std::cout<<" "<<std::endl;
-
-//    for (int cMessage = 0; cMessage<countMessage; cMessage++){
-//
-//        traj_points_cartesianSpace.conservativeResize(totalStep + updateSize, 3);
-//        // assign checkpoint into current T and final T between 2 pose
-//        if (cMessage==0){
-//            cur_P << 0,0,0;
-//            final_P=checkpoint.block(cMessage,0,1,3).transpose();
-//        }
-//        else{
-//            cur_P = checkpoint.block(cMessage-1,0,1,3).transpose();
-//            final_P=checkpoint.block(cMessage,0,1,3).transpose();
-//        }
-//
-//        double cTime = 0;
-//        for (int cStep=0; cStep<totalStep; cStep++){
-//            sol_P = cur_P + cTime*(final_P-cur_P);
-//
-//            traj_points_cartesianSpace.block(cStep + updateSize,0,1,3) = sol_P.transpose();
-//
-//            cTime+=dt;
-//
-//            //compute the last step
-//            if (cMessage==8){
-//                traj_points_cartesianSpace.conservativeResize(totalStep + updateSize + 1, 3);
-//
-//                sol_P = cur_P + cTime*(final_P-cur_P);
-//
-//                traj_points_cartesianSpace.block(cStep + updateSize + 1,0,1,3) = sol_P.transpose();
-//            }
-//
-//        }
-//
-//        updateSize = traj_points_cartesianSpace.rows();
-//
-//    }
-
+//    std::cout<<traj_points_jointSpace<<std::endl;
+//    std::cout<<" "<<std::endl;
 }
 void compute_obstaclePosition(YoubotIkine youbot_kine){
     /*========================== obstacle declaration (dimension) ==================================*/
@@ -344,10 +302,10 @@ void compute_obstaclePosition(YoubotIkine youbot_kine){
 void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     // scalar parameters
     // if Matrix is not initialised as zero, by default it will create either a large number or very small number in each element
-    MatrixXd force_att = MatrixXd::Zero(3,5),force_rep= MatrixXd::Zero(3,5);
+    MatrixXd force_att = MatrixXd::Zero(3,5),  force_rep= MatrixXd::Zero(3,5);
     Matrix4d T_init,T_final;
-    MatrixXd tau_q = MatrixXd::Zero(5,5);
-    MatrixXd tau_q_sum=MatrixXd::Zero(5,1);
+    MatrixXd tau_q = MatrixXd::Zero(5,5),  tau_q_sum = MatrixXd::Zero(5,1);
+
     VectorXd current_joint_position=VectorXd::Zero(5);
     MatrixXd desired_joint_position=MatrixXd::Zero(5,3); // 5 joints (row) by number of steps (col)
 
@@ -362,10 +320,10 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     double alpha; //scalar for the torque
     double epsilon; // convergence criteria
 
-    zeta << 0.8,0.8,0.8,0.8,0.8;
+    zeta << 0.8, 0.8, 0.8, 0.8, 0.8;
     eta  << 0.4, 0.2, 0.2, 0.5, 0.2;
-    d   = 0.5;
-    rho = 0.1;
+    d   = 0.1;
+    rho = 0.01;
     alpha = 0.1;
     epsilon = 0.01;
 
@@ -373,13 +331,12 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
     compute_obstaclePosition(youbot_kine);
 
     int countPoints=1;//traj_points_jointSpace.rows();
-    int updateSize = 0;
 
     // loop through each message point (9 checkpoint)
     for (int cPoints=0;cPoints<countPoints;cPoints++){
         // gradient descent algorithm
         int cStep;
-        for (cStep=0; cStep < 10000000; cStep++){
+        for (cStep=0; cStep < 100; cStep++){
 
             // initialise to zero
             force_att.setZero();
@@ -498,12 +455,12 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
 
             double difference_in_q = (current_q - final_q).norm();
 
-            std::cout<<"Init_o: \n"<<youbot_kine.forward_kinematics(current_q,4)<<"\n"<<std::endl;
-            std::cout<<"Final_o: \n"<<youbot_kine.forward_kinematics(final_q,4)<<"\n"<<std::endl;
-            std::cout<<"\nDifference_o: "<<(youbot_kine.forward_kinematics(current_q,4).block(0,3,3,1)-youbot_kine.forward_kinematics(final_q,4).block(0,3,3,1)).norm()<<"\n"<<std::endl;
-            std::cout<<"Init_q: \n"<<current_q<<"\n"<<std::endl;
-            std::cout<<"Final_q:\n"<<final_q<<"\n"<<std::endl;
-            std::cout<<"\nDifference: "<<difference_in_q<<" ... "<<cStep<<std::endl;
+//            std::cout<<"Init_o: \n"<<youbot_kine.forward_kinematics(current_q,4)<<"\n"<<std::endl;
+//            std::cout<<"Final_o: \n"<<youbot_kine.forward_kinematics(final_q,4)<<"\n"<<std::endl;
+//            std::cout<<"\nDifference_o: "<<(youbot_kine.forward_kinematics(current_q,4).block(0,3,3,1)-youbot_kine.forward_kinematics(final_q,4).block(0,3,3,1)).norm()<<"\n"<<std::endl;
+//            std::cout<<"Init_q: \n"<<current_q<<"\n"<<std::endl;
+//            std::cout<<"Final_q:\n"<<final_q<<"\n"<<std::endl;
+//            std::cout<<"\nDifference: "<<difference_in_q<<" ... "<<cStep<<std::endl;
 
             if ( difference_in_q < epsilon ){
                 std::cout<<current_q<<"    "<<final_q<<std::endl;
@@ -512,32 +469,32 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
 
             // check if stuck in local minima
 
-//            if (cStep%2==0){ //even step
-//                if (difference_q_old_1==difference_in_q){
-//                    count_1 = count_1 + 1;
-//                }
-//                if (count_1>20){
-//                    localMin_state=1;
-//                    count_1 = 0;
-//                }
-//                else{
-//                    localMin_state = 0; // reset the state
-//                }
-//                difference_q_old_1 = difference_in_q;
-//            }
-//            else{
-//                if (difference_q_old_2==difference_in_q){
-//                    count_2 = count_2 +1;
-//                }
-//                if (count_2>20){
-//                    localMin_state=1;
-//                    count_2 = 0;
-//                }
-//                else{
-//                    localMin_state = 0; // reset the state
-//                }
-//                difference_q_old_2 = difference_in_q;
-//            }
+            if (cStep%2==0){ //even step
+                if (difference_q_old_1==difference_in_q){
+                    count_1 = count_1 + 1;
+                }
+                if (count_1>20){
+                    localMin_state=1;
+                    count_1 = 0;
+                }
+                else{
+                    localMin_state = 0; // reset the state
+                }
+                difference_q_old_1 = difference_in_q;
+            }
+            else{
+                if (difference_q_old_2==difference_in_q){
+                    count_2 = count_2 +1;
+                }
+                if (count_2>20){
+                    localMin_state=1;
+                    count_2 = 0;
+                }
+                else{
+                    localMin_state = 0; // reset the state
+                }
+                difference_q_old_2 = difference_in_q;
+            }
             std::cout<<"\n"<<count_1<<"....."<<count_2<<std::endl;
             if (localMin_state){
                 VectorXd noiseVec(5);
@@ -556,17 +513,15 @@ void compute_potentialField(YoubotIkine youbot_kine,YoubotKDL youbot_kdl){
 
 
         }// end for cStep loop (gradient descent algorithm)
-        std::cout<<"cStep: "<<cStep<<std::endl;
-        std::cout<<"noCols: "<<desired_joint_position.cols()<<std::endl;
-//        std::cout<<desired_joint_position<<"\n"<<std::endl;
-//        std::cout<<traj_points_jointSpace.block(cPoints,0,1,5).transpose()<<std::endl;
+//        std::cout<<"cStep: "<<cStep<<std::endl;
+//        std::cout<<"noCols: "<<desired_joint_position.cols()<<std::endl;
+
         // store all the previous joints configuration that avoid obstacle
         double noCol = desired_joint_position.cols();
 
         traj_pts_jointSpace_avoidObstacle.conservativeResize(5,noCol);
 
         traj_pts_jointSpace_avoidObstacle.block(0,cPoints,5,noCol) = desired_joint_position;
-
 
     }// end for cPoint loop
 
@@ -588,8 +543,6 @@ int main(int argc, char **argv)
 
     int countPoints=traj_points_jointSpace.rows();
 
-
-
     std::cout<<countPoints<<std::endl;
 
     // spinOnce cannot get the obstacle position
@@ -599,13 +552,12 @@ int main(int argc, char **argv)
         std::cout<<i<<"...Obstacle Position\n"<<youbot_kine.obstacle_position<<std::endl;
     }
 
+    // perform potential field computation
     compute_potentialField(youbot_kine,youbot_kdl);
 
     while (ros::ok())
     {
         int countPoints = traj_pts_jointSpace_avoidObstacle.cols();
-
-
 
         for (int cPoints=0;cPoints<countPoints;cPoints++) {
             std::cout << "start " << cPoints << "\n" << std::endl;
@@ -613,12 +565,11 @@ int main(int argc, char **argv)
             VectorXd desiredJointPosition = traj_pts_jointSpace_avoidObstacle.block(0,cPoints,5,1);
             std::cout<<desiredJointPosition<<std::endl;
 
-
             traj_pt.positions.clear();
             for (int i = 0; i < 5; i++) {
                 traj_pt.positions.push_back(desiredJointPosition(i));
             }
-            double dt = 1;//traj_points(cPoints, 6);
+            double dt = 1;
             youbot_kine.publish_trajectory(traj_pt, dt * 1e9);
 
             ros::Duration(dt).sleep();

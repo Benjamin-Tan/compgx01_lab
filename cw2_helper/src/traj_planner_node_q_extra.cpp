@@ -2,14 +2,11 @@
 #include <cw2_helper/YoubotIkine.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
-#include <trajectory_msgs/JointTrajectory.h>
-#include <geometry_msgs/Point.h>
 
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 
 #include <unsupported/Eigen/MatrixFunctions>
-// testing
 #include <inverse_kinematics/YoubotKDL.h>
 
 trajectory_msgs::JointTrajectoryPoint traj_pt;
@@ -19,7 +16,6 @@ MatrixXf q_free = MatrixXf::Zero(3,5);
 struct obstacle{
     // 0:x, 1:y, 2:z
     float centre[3];
-
     float length[3];
 };
 obstacle box1,box2,box3,box4,cyl0,cyl1;
@@ -105,6 +101,7 @@ void assignObstacle_properties(YoubotIkine youbot_kine){
 
 }
 
+// check collision by joint space input argument
 bool checkCollision_node(VectorXd joints_random, YoubotIkine youbot_kine){
     // return true if collide
     MatrixXd T_random = youbot_kine.forward_kinematics(joints_random,4);
@@ -165,6 +162,7 @@ bool checkCollision_node(VectorXd joints_random, YoubotIkine youbot_kine){
 
 }
 
+// check collision by cartesian space input argument
 bool checkCollision_node_cart(VectorXd joints_cart, YoubotIkine youbot_kine){
     // return true if collide
     Vector3d pose_random = joints_cart;
@@ -226,6 +224,7 @@ bool checkCollision_node_cart(VectorXd joints_cart, YoubotIkine youbot_kine){
 }
 
 bool pairCompare(std::pair<float,float> i, std::pair<float,float> j){
+    // look for the minimum value
     return i.second < j.second;
 }
 
@@ -241,7 +240,9 @@ void traj_q_extra (MatrixXd checkpoint, YoubotIkine youbot_kine, YoubotKDL youbo
     std::uniform_real_distribution<double> distribution5(0.0,5.8469);
 
     int i = 0;
-    int no_sampling = 10000;
+    int no_sampling = 1000; // reduce this if it takes too long, however accuracy will decrease
+    int k = 10; //number of nearest neighbour
+
     int updateSize=0;
     float joint1,joint2,joint3,joint4,joint5;
     VectorXd joints_random = VectorXd::Zero(5);
@@ -271,7 +272,6 @@ void traj_q_extra (MatrixXd checkpoint, YoubotIkine youbot_kine, YoubotKDL youbo
     }// end PRM sampling
 
     // find k-nearest neighbour and connect edges without colliding obstacle ================
-    int k = 10; // nearest neighbour
 
     std::map <float,VectorXf> distanceMap, distanceMap_free; //key: distance, value: index(q_current, q_other)
     std::map <float,VectorXf> knnMap[no_sampling];
@@ -350,6 +350,7 @@ void traj_q_extra (MatrixXd checkpoint, YoubotIkine youbot_kine, YoubotKDL youbo
 
     // Compute the shortest path using Dijkstra's algorithm ==========================================
     std::cout<<checkpoint<<std::endl;
+
     int countPoints = checkpoint.rows();
     VectorXf init_q_cart = VectorXf::Zero(3);
     VectorXf final_q_cart = VectorXf::Zero(3);
@@ -564,23 +565,13 @@ void traj_q_extra (MatrixXd checkpoint, YoubotIkine youbot_kine, YoubotKDL youbo
 
             traj_points.block(updateSize+i,0,1,5) = q_free.row(pathSeq.at(i));
         }
-//        traj_points.block(cPoint,0,)
+
         std::cout<<traj_points<<std::endl;
 
         updateSize = traj_points.rows();
         // for previous position
         desiredPose_old = desiredPose;
-
     }
-
-//    for (int j=0; j<10;++j){
-//        std::cout<<"j: "<<j<<"\n"<<std::endl;
-//        std::map<float,VectorXf>::iterator itr;
-//        for (itr = knnMap[j].begin(); itr!=knnMap[j].end(); ++itr){
-//            std::cout<< itr->first << '\t'<<itr->second<<'\n' <<std::endl;
-//        }
-//        std::cout<<"\n"<<std::endl;
-//    }
 }
 
 int main(int argc, char **argv)
@@ -597,7 +588,7 @@ int main(int argc, char **argv)
     MatrixXd check_point_matrix = get_checkpoint();
     std::cout<<check_point_matrix<<"\n"<<std::endl;
 
-    // spinOnce cannot get the obstacle position
+    // spinOnce cannot get the obstacle position, loop multiple times to get position
     for (int i = 0; i<3;i++){
         ros::spinOnce();
         ros::Duration(0.3).sleep();
@@ -607,8 +598,10 @@ int main(int argc, char **argv)
     assignObstacle_properties(youbot_kine);
 
     traj_q_extra(check_point_matrix,youbot_kine,youbot_kdl);
+
     int countPoints=traj_points.rows();
     int cPoints = 0;
+
     std::cout<<countPoints<<std::endl;
     while (ros::ok())
     {
@@ -619,14 +612,13 @@ int main(int argc, char **argv)
             for (int i=0; i<5; i++){
                 traj_pt.positions.push_back(traj_points(cPoints,i));
             }
-            double dt = 0.8;//traj_points(cPoints,6);
+            double dt = 0.8;
             youbot_kine.publish_trajectory(traj_pt,dt*1e9);
 
             ros::Duration(dt).sleep();
             std::cout<<"after publish\n"<<std::endl;
             ros::spinOnce();
         }
-        //sleep(1);
     }
 
     return 0;

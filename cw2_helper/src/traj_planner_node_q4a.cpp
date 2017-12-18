@@ -2,14 +2,10 @@
 #include <cw2_helper/YoubotIkine.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
-#include <trajectory_msgs/JointTrajectory.h>
-#include <geometry_msgs/Point.h>
 
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 
-// testing
-#include <inverse_kinematics/YoubotKDL.h>
 
 trajectory_msgs::JointTrajectoryPoint traj_pt;
 MatrixXd traj_points;
@@ -40,22 +36,16 @@ MatrixXd get_checkpoint()
             //Fill in the code to retrieve data from a bag
             jointData = *j;
             for (int i=0; i<5; i++) {
-
                 p(countMessage,i) = jointData.position[i];
                 p(countMessage,i+5) = jointData.velocity[i];
             }
             // combine the time stamp into sec
             p(countMessage,10) = jointData.header.stamp.sec + jointData.header.stamp.nsec / 1e9;
-
         }
         countMessage++;
-
     }
-
     bag.close();
-
     return p;
-
 }
 
 MatrixXd computeA_constant(MatrixXd checkpoint, int cMessage){
@@ -106,7 +96,7 @@ void traj_q4a (MatrixXd checkpoint)
     // Converts the checkpoint matrix into trajectory point messages using cubic spline
 
     double time_init, time_final;
-    double dt = 0.1; // 0.5 seconds
+    double dt = 0.1; // 0.1 seconds
 
     int countMessage = checkpoint.rows();
     int updateSize = 0;
@@ -115,7 +105,6 @@ void traj_q4a (MatrixXd checkpoint)
     Vector4d t_pos, t_vel; // time vector for position and velocity
 
     traj_points.resize(5,11);
-
 
     for (int cMessage = 0;cMessage<countMessage;cMessage++) {
 
@@ -167,7 +156,6 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "youbot_traj_4a");
 
     YoubotIkine youbot_kine;
-
     youbot_kine.init();
 
     MatrixXd check_point_matrix = get_checkpoint();
